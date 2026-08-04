@@ -27,8 +27,10 @@
     display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;letter-spacing:.5px;color:#fff}
   header h1{font-size:15px;font-weight:600;margin:0;color:var(--dim)}
   header h1 b{color:var(--txt);font-weight:700}
+  #ver-proximos{margin-left:auto;background:none;border:1px solid var(--line);border-radius:10px;
+    color:var(--accent);font-size:13px;font-weight:700;padding:7px 11px;cursor:pointer}
 
-  .monto-wrap{padding:18px 0 6px;text-align:center}
+  .monto-wrap{padding:14px 0 4px;text-align:center}
   .monto-box{display:flex;align-items:baseline;justify-content:center;gap:6px}
   .monto-box .signo{font-size:30px;color:var(--dim);font-weight:600}
   #monto{font-size:52px;font-weight:800;background:none;border:none;color:var(--txt);
@@ -40,6 +42,10 @@
     color:var(--txt);font-size:16px;padding:13px 14px;outline:none}
   #descripcion:focus{border-color:var(--accent)}
   #descripcion::placeholder{color:var(--dim)}
+  .fila-fecha{display:flex;align-items:center;gap:10px;margin:10px 0 0}
+  .fila-fecha label{font-size:11px;font-weight:700;letter-spacing:1.2px;color:var(--dim)}
+  #fecha{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    color:var(--txt);font-size:15px;padding:10px 12px;outline:none;color-scheme:dark}
 
   .grupo{margin:14px 0 0}
   .grupo label{display:block;font-size:11px;font-weight:700;letter-spacing:1.2px;color:var(--dim);margin:0 0 8px 2px}
@@ -49,6 +55,8 @@
     transition:background .12s,border-color .12s}
   .chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
   .chips.cuotas .chip{min-width:52px;flex:1 1 0}
+  #recurrente{width:100%;margin-top:14px}
+  #recurrente.on{background:var(--warn);border-color:var(--warn);color:#1a1305}
 
   #credito-extra{display:none}
   #credito-extra.show{display:block}
@@ -56,7 +64,7 @@
     border-radius:12px;color:var(--txt);font-size:15px;padding:11px 13px;outline:none}
   #tarjeta-otra.show{display:block}
 
-  #guardar{margin-top:22px;width:100%;padding:17px;border:none;border-radius:14px;
+  #guardar{margin-top:20px;width:100%;padding:17px;border:none;border-radius:14px;
     background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;
     font-size:17px;font-weight:800;letter-spacing:.3px;cursor:pointer;transition:transform .08s,opacity .2s}
   #guardar:active{transform:scale(.985)}
@@ -66,55 +74,93 @@
   #pendientes{display:none;margin-top:6px;font-size:12px;color:var(--warn)}
   #pendientes.show{display:block}
   #exportar{margin-top:8px;font-size:12px;color:var(--dim);text-decoration:underline;background:none;border:none;cursor:pointer}
+
+  /* Vista Próximos meses */
+  #vista-proximos{display:none}
+  body.modo-proximos #vista-form{display:none}
+  body.modo-proximos #vista-proximos{display:block}
+  .clave-gate{margin:24px 0;text-align:center}
+  .clave-gate input{width:100%;max-width:260px;background:var(--panel);border:1px solid var(--line);
+    border-radius:12px;color:var(--txt);font-size:16px;padding:13px 14px;outline:none;text-align:center}
+  .clave-gate button{margin-top:10px;padding:12px 26px;border:none;border-radius:12px;
+    background:var(--accent);color:#fff;font-size:15px;font-weight:700;cursor:pointer}
+  .mes-card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin:10px 0}
+  .mes-card h3{margin:0 0 4px;font-size:14px;letter-spacing:.6px;color:var(--dim);text-transform:uppercase}
+  .mes-card .total{font-size:26px;font-weight:800;margin-bottom:8px}
+  .mes-item{display:flex;justify-content:space-between;gap:8px;font-size:13.5px;color:var(--dim);padding:3px 0}
+  .mes-item span:last-child{color:var(--txt);font-weight:600;white-space:nowrap}
+  .prox-nota{font-size:12px;color:var(--dim);text-align:center;margin:10px 0}
+  #cambiar-clave{background:none;border:none;color:var(--dim);font-size:11.5px;text-decoration:underline;cursor:pointer;display:block;margin:8px auto 0}
 </style>
 </head>
 <body>
 <header>
   <div class="logo">AS</div>
   <h1><b>Mis gastos</b> · Apex Sync</h1>
+  <button id="ver-proximos">Próximos →</button>
 </header>
 
-<div class="monto-wrap">
-  <div class="monto-box">
-    <span class="signo">$</span>
-    <input id="monto" type="text" inputmode="numeric" autocomplete="off" placeholder="0">
-  </div>
-</div>
-
-<div class="campo">
-  <input id="descripcion" type="text" autocomplete="off" placeholder="¿En qué? (ej: nafta, super, tarjeta)">
-</div>
-
-<div class="grupo">
-  <label>MÉTODO</label>
-  <div class="chips" id="chips-metodo">
-    <button class="chip on" data-v="efectivo">Efectivo</button>
-    <button class="chip" data-v="transferencia">Transf.</button>
-    <button class="chip" data-v="credito">Crédito</button>
-  </div>
-</div>
-
-<div id="credito-extra">
-  <div class="grupo">
-    <label>TARJETA</label>
-    <div class="chips" id="chips-tarjeta">
-      <button class="chip on" data-v="Visa Francés">Visa Francés</button>
-      <button class="chip" data-v="__otra">Otra</button>
-    </div>
-    <input id="tarjeta-otra" type="text" placeholder="¿Qué tarjeta?">
-  </div>
-  <div class="grupo">
-    <label>CUOTAS</label>
-    <div class="chips cuotas" id="chips-cuotas">
-      <button class="chip on" data-v="1">1</button>
-      <button class="chip" data-v="3">3</button>
-      <button class="chip" data-v="6">6</button>
-      <button class="chip" data-v="12">12</button>
+<div id="vista-form">
+  <div class="monto-wrap">
+    <div class="monto-box">
+      <span class="signo">$</span>
+      <input id="monto" type="text" inputmode="numeric" autocomplete="off" placeholder="0">
     </div>
   </div>
+
+  <div class="campo">
+    <input id="descripcion" type="text" autocomplete="off" placeholder="¿En qué? (ej: nafta, super, tarjeta)">
+  </div>
+
+  <div class="fila-fecha">
+    <label>FECHA</label>
+    <input id="fecha" type="date">
+  </div>
+
+  <div class="grupo">
+    <label>MÉTODO</label>
+    <div class="chips" id="chips-metodo">
+      <button class="chip on" data-v="efectivo">Efectivo</button>
+      <button class="chip" data-v="transferencia">Transf.</button>
+      <button class="chip" data-v="credito">Crédito</button>
+    </div>
+  </div>
+
+  <div id="credito-extra">
+    <div class="grupo">
+      <label>TARJETA</label>
+      <div class="chips" id="chips-tarjeta">
+        <button class="chip on" data-v="Visa Francés">Visa Francés</button>
+        <button class="chip" data-v="__otra">Otra</button>
+      </div>
+      <input id="tarjeta-otra" type="text" placeholder="¿Qué tarjeta?">
+    </div>
+    <div class="grupo">
+      <label>CUOTAS</label>
+      <div class="chips cuotas" id="chips-cuotas">
+        <button class="chip on" data-v="1">1</button>
+        <button class="chip" data-v="3">3</button>
+        <button class="chip" data-v="6">6</button>
+        <button class="chip" data-v="12">12</button>
+      </div>
+    </div>
+  </div>
+
+  <button id="recurrente" class="chip">🔁 Se repite todos los meses</button>
+
+  <button id="guardar">Guardar gasto</button>
 </div>
 
-<button id="guardar">Guardar gasto</button>
+<div id="vista-proximos">
+  <div id="clave-gate" class="clave-gate" hidden>
+    <p style="color:var(--dim);font-size:14px">Tu clave para ver la proyección:</p>
+    <input id="clave-input" type="text" autocomplete="off" placeholder="clave">
+    <br><button id="clave-ok">Entrar</button>
+  </div>
+  <div id="meses"></div>
+  <p class="prox-nota" id="prox-nota" hidden>Suma cuotas pendientes + gastos que se repiten. Las cuotas empiezan el mes siguiente a la compra.</p>
+  <button id="cambiar-clave" hidden>cambiar clave</button>
+</div>
 
 <footer>
   Se guarda al instante · Jarvis lo lee y actualiza tus finanzas
@@ -125,9 +171,12 @@
 <script>
 const SUPABASE_URL = 'https://kfiywiqivibktzakclyv.supabase.co';
 const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtmaXl3aXFpdmlia3R6YWtjbHl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyMTA1MTgsImV4cCI6MjA5ODc4NjUxOH0.Z1DQW5ySGolzrjsqeesg824cpctqa04BOS2RSH4NTNo';
+const TABLA = 'gastos_jose';
+const RPC_LISTA = 'gastos_jose_lista';
 const LS_KEY = 'gastos_jose_v1';
+const CLAVE_KEY = 'gastos_jose_clave';
 
-const sel = { metodo:'efectivo', tarjeta:'Visa Francés', cuotas:1 };
+const sel = { metodo:'efectivo', tarjeta:'Visa Francés', cuotas:1, recurrente:false };
 
 function initChips(id, campo, cb){
   const box = document.getElementById(id);
@@ -148,6 +197,12 @@ initChips('chips-tarjeta','tarjeta', v => {
 });
 initChips('chips-cuotas','cuotas');
 
+const recEl = document.getElementById('recurrente');
+recEl.addEventListener('click', () => {
+  sel.recurrente = !sel.recurrente;
+  recEl.classList.toggle('on', sel.recurrente);
+});
+
 // Monto con puntos de miles mientras tipea (es-AR)
 const montoEl = document.getElementById('monto');
 montoEl.addEventListener('input', () => {
@@ -159,12 +214,14 @@ function hoyLocal(){
   const d = new Date();
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
 }
+const fechaEl = document.getElementById('fecha');
+fechaEl.value = hoyLocal();
 
 function leerLS(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)) || []; }catch(e){ return []; } }
 function escribirLS(a){ localStorage.setItem(LS_KEY, JSON.stringify(a)); }
 
 async function postSupabase(g){
-  const r = await fetch(SUPABASE_URL + '/rest/v1/gastos_jose', {
+  const r = await fetch(SUPABASE_URL + '/rest/v1/' + TABLA, {
     method:'POST',
     headers:{
       'apikey': ANON_KEY,
@@ -208,12 +265,13 @@ btn.addEventListener('click', async () => {
       : sel.tarjeta;
   }
   const gasto = {
-    fecha: hoyLocal(),
+    fecha: fechaEl.value || hoyLocal(),
     monto: monto,
     descripcion: document.getElementById('descripcion').value.trim(),
     metodo: sel.metodo,
     tarjeta: tarjeta,
     cuotas: esCredito ? sel.cuotas : 1,
+    es_recurrente: sel.recurrente,
   };
 
   btn.disabled = true; btn.textContent = 'Guardando…';
@@ -230,6 +288,8 @@ btn.addEventListener('click', async () => {
   setTimeout(() => {
     btn.disabled = false; btn.textContent = 'Guardar gasto';
     montoEl.value = ''; document.getElementById('descripcion').value = '';
+    fechaEl.value = hoyLocal();
+    sel.recurrente = false; recEl.classList.remove('on');
   }, 1300);
   refrescarPendientes();
 });
@@ -242,6 +302,103 @@ document.getElementById('exportar').addEventListener('click', () => {
   a.download = 'gastos-jose-respaldo.json';
   a.click();
 });
+
+// ---------- Vista Próximos meses ----------
+const fmt$ = n => '$' + Math.round(n).toLocaleString('es-AR');
+
+document.getElementById('ver-proximos').addEventListener('click', () => {
+  const enProximos = document.body.classList.toggle('modo-proximos');
+  document.getElementById('ver-proximos').textContent = enProximos ? '← Cargar gasto' : 'Próximos →';
+  if(enProximos) abrirProximos();
+});
+
+document.getElementById('clave-ok').addEventListener('click', () => {
+  const v = document.getElementById('clave-input').value.trim();
+  if(!v) return;
+  localStorage.setItem(CLAVE_KEY, v);
+  abrirProximos();
+});
+document.getElementById('cambiar-clave').addEventListener('click', () => {
+  localStorage.removeItem(CLAVE_KEY);
+  abrirProximos();
+});
+
+async function abrirProximos(){
+  const gate = document.getElementById('clave-gate');
+  const meses = document.getElementById('meses');
+  const clave = localStorage.getItem(CLAVE_KEY);
+  document.getElementById('prox-nota').hidden = true;
+  document.getElementById('cambiar-clave').hidden = true;
+  if(!clave){ gate.hidden = false; meses.innerHTML = ''; return; }
+  gate.hidden = true;
+  meses.innerHTML = '<p class="prox-nota">Cargando…</p>';
+  let filas = [];
+  try{
+    const r = await fetch(SUPABASE_URL + '/rest/v1/rpc/' + RPC_LISTA, {
+      method:'POST',
+      headers:{'apikey':ANON_KEY,'Authorization':'Bearer '+ANON_KEY,'Content-Type':'application/json'},
+      body: JSON.stringify({clave}),
+    });
+    filas = await r.json();
+    if(!Array.isArray(filas)) filas = [];
+  }catch(e){ meses.innerHTML = '<p class="prox-nota">Sin conexión — probá de nuevo.</p>'; return; }
+  if(!filas.length){
+    meses.innerHTML = '<p class="prox-nota">Sin datos (¿la clave está bien?).</p>';
+    document.getElementById('cambiar-clave').hidden = false;
+    return;
+  }
+  render(proyectar(filas));
+  document.getElementById('prox-nota').hidden = false;
+  document.getElementById('cambiar-clave').hidden = false;
+}
+
+function proyectar(filas){
+  const hoy = new Date();
+  const meses = [];
+  for(let k = 0; k < 6; k++){
+    const d = new Date(hoy.getFullYear(), hoy.getMonth() + k, 1);
+    meses.push({y: d.getFullYear(), m: d.getMonth(), items: []});
+  }
+  const idx = (y, m) => (y - meses[0].y) * 12 + (m - meses[0].m);
+  for(const f of filas){
+    const [fy, fm] = f.fecha.split('-').map(Number);
+    const base = idx(fy, fm - 1);
+    const etiqueta = f.descripcion || '(sin detalle)';
+    if(f.es_recurrente){
+      for(let k = 0; k < meses.length; k++){
+        if(k > base) meses[k].items.push({t:'🔁 ' + etiqueta, v: Number(f.monto)});
+      }
+    }
+    if(f.cuotas > 1){
+      const cuota = Number(f.monto) / f.cuotas;
+      const tarj = f.tarjeta ? ' · ' + f.tarjeta : '';
+      for(let n = 1; n <= f.cuotas; n++){
+        const k = base + n;
+        if(k >= 0 && k < meses.length)
+          meses[k].items.push({t: etiqueta + ' (cuota ' + n + '/' + f.cuotas + ')' + tarj, v: cuota});
+      }
+    }
+  }
+  return meses;
+}
+
+function render(meses){
+  const cont = document.getElementById('meses');
+  cont.innerHTML = '';
+  let algo = false;
+  for(const mes of meses){
+    if(!mes.items.length) continue;
+    algo = true;
+    const total = mes.items.reduce((s, i) => s + i.v, 0);
+    const nombre = new Date(mes.y, mes.m, 1).toLocaleDateString('es-AR', {month:'long', year:'numeric'});
+    const card = document.createElement('div');
+    card.className = 'mes-card';
+    card.innerHTML = '<h3>' + nombre + '</h3><div class="total">' + fmt$(total) + '</div>' +
+      mes.items.map(i => '<div class="mes-item"><span>' + i.t + '</span><span>' + fmt$(i.v) + '</span></div>').join('');
+    cont.appendChild(card);
+  }
+  if(!algo) cont.innerHTML = '<p class="prox-nota">Nada proyectado: sin cuotas pendientes ni gastos recurrentes.</p>';
+}
 
 reintentarPendientes();
 if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');

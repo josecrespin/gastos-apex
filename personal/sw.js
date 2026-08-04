@@ -1,6 +1,6 @@
 // Service worker de la app personal: cachea el shell para abrir offline.
 // Scope: /gastos-apex/personal/ (no toca la app de obras).
-const CACHE = 'gastos-jose-v1';
+const CACHE = 'gastos-jose-v2';
 const SHELL = ['.', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {
