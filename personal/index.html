@@ -3,18 +3,18 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<title>Obras · Apex Sync</title>
-<meta name="theme-color" content="#0c0d10">
+<title>Gastos José · Apex Sync</title>
+<meta name="theme-color" content="#0c100d">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Obras AS">
+<meta name="apple-mobile-web-app-title" content="Gastos José">
 <style>
   :root{
-    --bg:#0c0d10; --panel:#15171c; --line:#23262e;
-    --txt:#f2f3f5; --dim:#8b909c;
-    --accent:#4f7cff; --accent2:#3b5fd9;
+    --bg:#0c100d; --panel:#151c17; --line:#232e26;
+    --txt:#f2f5f3; --dim:#8b9c90;
+    --accent:#2fbf71; --accent2:#249a59;
     --ok:#2ecc71; --warn:#f0a92e;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
@@ -24,7 +24,7 @@
     padding:env(safe-area-inset-top) 16px calc(env(safe-area-inset-bottom) + 12px)}
   header{display:flex; align-items:center; gap:10px; padding:14px 2px 6px}
   .logo{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--accent),var(--accent2));
-    display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;letter-spacing:.5px}
+    display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;letter-spacing:.5px;color:#fff}
   header h1{font-size:15px;font-weight:600;margin:0;color:var(--dim)}
   header h1 b{color:var(--txt);font-weight:700}
 
@@ -33,7 +33,7 @@
   .monto-box .signo{font-size:30px;color:var(--dim);font-weight:600}
   #monto{font-size:52px;font-weight:800;background:none;border:none;color:var(--txt);
     width:100%;max-width:260px;text-align:center;outline:none;padding:0;caret-color:var(--accent)}
-  #monto::placeholder{color:#3a3e48}
+  #monto::placeholder{color:#39443c}
 
   .campo{margin:10px 0}
   #descripcion{width:100%;background:var(--panel);border:1px solid var(--line);border-radius:12px;
@@ -48,7 +48,6 @@
     background:var(--panel);color:var(--txt);font-size:14.5px;font-weight:600;text-align:center;cursor:pointer;
     transition:background .12s,border-color .12s}
   .chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
-  .chip.off{opacity:.32;pointer-events:none}
   .chips.cuotas .chip{min-width:52px;flex:1 1 0}
 
   #credito-extra{display:none}
@@ -61,7 +60,6 @@
     background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;
     font-size:17px;font-weight:800;letter-spacing:.3px;cursor:pointer;transition:transform .08s,opacity .2s}
   #guardar:active{transform:scale(.985)}
-  #guardar.ok{background:var(--ok)}
   #guardar:disabled{opacity:.6}
 
   footer{margin-top:auto;padding-top:18px;text-align:center;font-size:12.5px;color:var(--dim)}
@@ -73,7 +71,7 @@
 <body>
 <header>
   <div class="logo">AS</div>
-  <h1><b>Gasto de obra</b> · Apex Sync</h1>
+  <h1><b>Mis gastos</b> · Apex Sync</h1>
 </header>
 
 <div class="monto-wrap">
@@ -84,24 +82,7 @@
 </div>
 
 <div class="campo">
-  <input id="descripcion" type="text" autocomplete="off" placeholder="¿En qué? (ej: membrana, SAT, cemento)">
-</div>
-
-<div class="grupo">
-  <label>OBRA</label>
-  <div class="chips" id="chips-proyecto">
-    <button class="chip on" data-v="fagu_obra">Obra FAGU</button>
-    <button class="chip" data-v="tafi">Casa Tafí</button>
-  </div>
-</div>
-
-<div class="grupo">
-  <label>PAGÓ</label>
-  <div class="chips" id="chips-quien">
-    <button class="chip on" data-v="jose">Yo</button>
-    <button class="chip" data-v="facu">Facu</button>
-    <button class="chip" data-v="agus">Agus</button>
-  </div>
+  <input id="descripcion" type="text" autocomplete="off" placeholder="¿En qué? (ej: nafta, super, tarjeta)">
 </div>
 
 <div class="grupo">
@@ -144,21 +125,14 @@
 <script>
 const SUPABASE_URL = 'https://kfiywiqivibktzakclyv.supabase.co';
 const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtmaXl3aXFpdmlia3R6YWtjbHl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyMTA1MTgsImV4cCI6MjA5ODc4NjUxOH0.Z1DQW5ySGolzrjsqeesg824cpctqa04BOS2RSH4NTNo';
-const LS_KEY = 'gastos_obras_v1';
+const LS_KEY = 'gastos_jose_v1';
 
-// Qué métodos puede usar cada uno (regla de la familia)
-const METODOS_POR_PERSONA = {
-  jose: ['efectivo','transferencia','credito'],
-  facu: ['efectivo','transferencia'],
-  agus: ['efectivo','transferencia'],
-};
-
-const sel = { proyecto:'fagu_obra', quien:'jose', metodo:'efectivo', tarjeta:'Visa Francés', cuotas:1 };
+const sel = { metodo:'efectivo', tarjeta:'Visa Francés', cuotas:1 };
 
 function initChips(id, campo, cb){
   const box = document.getElementById(id);
   box.addEventListener('click', e => {
-    const b = e.target.closest('.chip'); if(!b || b.classList.contains('off')) return;
+    const b = e.target.closest('.chip'); if(!b) return;
     box.querySelectorAll('.chip').forEach(c => c.classList.remove('on'));
     b.classList.add('on');
     sel[campo] = campo === 'cuotas' ? parseInt(b.dataset.v, 10) : b.dataset.v;
@@ -166,8 +140,6 @@ function initChips(id, campo, cb){
   });
 }
 
-initChips('chips-proyecto','proyecto');
-initChips('chips-quien','quien', aplicarReglaMetodos);
 initChips('chips-metodo','metodo', v => {
   document.getElementById('credito-extra').classList.toggle('show', v === 'credito');
 });
@@ -175,22 +147,6 @@ initChips('chips-tarjeta','tarjeta', v => {
   document.getElementById('tarjeta-otra').classList.toggle('show', v === '__otra');
 });
 initChips('chips-cuotas','cuotas');
-
-function aplicarReglaMetodos(){
-  const permitidos = METODOS_POR_PERSONA[sel.quien];
-  const box = document.getElementById('chips-metodo');
-  box.querySelectorAll('.chip').forEach(c => {
-    const ok = permitidos.includes(c.dataset.v);
-    c.classList.toggle('off', !ok);
-    if(!ok && c.classList.contains('on')){
-      c.classList.remove('on');
-      sel.metodo = 'efectivo';
-      box.querySelector('[data-v="efectivo"]').classList.add('on');
-      document.getElementById('credito-extra').classList.remove('show');
-    }
-  });
-}
-aplicarReglaMetodos();
 
 // Monto con puntos de miles mientras tipea (es-AR)
 const montoEl = document.getElementById('monto');
@@ -208,7 +164,7 @@ function leerLS(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)) || []; }
 function escribirLS(a){ localStorage.setItem(LS_KEY, JSON.stringify(a)); }
 
 async function postSupabase(g){
-  const r = await fetch(SUPABASE_URL + '/rest/v1/gastos_obras', {
+  const r = await fetch(SUPABASE_URL + '/rest/v1/gastos_jose', {
     method:'POST',
     headers:{
       'apikey': ANON_KEY,
@@ -255,8 +211,6 @@ btn.addEventListener('click', async () => {
     fecha: hoyLocal(),
     monto: monto,
     descripcion: document.getElementById('descripcion').value.trim(),
-    proyecto: sel.proyecto,
-    quien: sel.quien,
     metodo: sel.metodo,
     tarjeta: tarjeta,
     cuotas: esCredito ? sel.cuotas : 1,
@@ -272,10 +226,9 @@ btn.addEventListener('click', async () => {
   if(ok){ item.estado = 'ok'; escribirLS(hist); }
 
   if(navigator.vibrate) navigator.vibrate(ok ? 30 : [60,60,60]);
-  btn.classList.add('ok');
   btn.textContent = ok ? '✓ Guardado' : '✓ Guardado acá (sincroniza después)';
   setTimeout(() => {
-    btn.classList.remove('ok'); btn.disabled = false; btn.textContent = 'Guardar gasto';
+    btn.disabled = false; btn.textContent = 'Guardar gasto';
     montoEl.value = ''; document.getElementById('descripcion').value = '';
   }, 1300);
   refrescarPendientes();
@@ -286,7 +239,7 @@ document.getElementById('exportar').addEventListener('click', () => {
   const blob = new Blob([data], {type:'application/json'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'gastos-respaldo.json';
+  a.download = 'gastos-jose-respaldo.json';
   a.click();
 });
 

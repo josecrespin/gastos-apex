@@ -1,6 +1,6 @@
-// Service worker mínimo: cachea el shell para abrir offline.
-// Los POST a Supabase nunca pasan por acá (solo GET same-origin).
-const CACHE = 'gastos-obras-v2';
+// Service worker de la app personal: cachea el shell para abrir offline.
+// Scope: /gastos-apex/personal/ (no toca la app de obras).
+const CACHE = 'gastos-jose-v1';
 const SHELL = ['.', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -10,7 +10,7 @@ self.addEventListener('install', e => {
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(k => (k.startsWith('gastos-obras-') || k === 'gastos-as-v1') && k !== CACHE).map(k => caches.delete(k))))
+      .then(keys => Promise.all(keys.filter(k => k.startsWith('gastos-jose-') && k !== CACHE).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
