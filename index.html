@@ -22,13 +22,14 @@
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
   body{min-height:100dvh; display:flex; flex-direction:column;
     padding:env(safe-area-inset-top) 16px calc(env(safe-area-inset-bottom) + 12px)}
-  header{display:flex; align-items:center; gap:10px; padding:14px 2px 6px}
+  header{display:flex; align-items:center; gap:8px; padding:14px 2px 6px}
   .logo{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--accent),var(--accent2));
-    display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;letter-spacing:.5px}
-  header h1{font-size:15px;font-weight:600;margin:0;color:var(--dim)}
+    display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;letter-spacing:.5px;flex:none}
+  header h1{font-size:15px;font-weight:600;margin:0;color:var(--dim);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   header h1 b{color:var(--txt);font-weight:700}
-  #ver-proximos{margin-left:auto;background:none;border:1px solid var(--line);border-radius:10px;
-    color:var(--accent);font-size:13px;font-weight:700;padding:7px 11px;cursor:pointer}
+  .nav-btn{background:none;border:1px solid var(--line);border-radius:10px;
+    color:var(--accent);font-size:12.5px;font-weight:700;padding:7px 9px;cursor:pointer;flex:none}
+  .nav-btn.act{background:var(--accent);color:#fff;border-color:var(--accent)}
 
   .monto-wrap{padding:14px 0 4px;text-align:center}
   .monto-box{display:flex;align-items:baseline;justify-content:center;gap:6px}
@@ -58,6 +59,8 @@
   .chips.cuotas .chip{min-width:52px;flex:1 1 0}
   #recurrente{width:100%;margin-top:14px}
   #recurrente.on{background:var(--warn);border-color:var(--warn);color:#1a1305}
+  #btn-foto{width:100%;margin-top:10px}
+  #btn-foto.on{background:var(--ok);border-color:var(--ok);color:#062712}
 
   #credito-extra{display:none}
   #credito-extra.show{display:block}
@@ -77,29 +80,40 @@
   #pendientes.show{display:block}
   #exportar{margin-top:8px;font-size:12px;color:var(--dim);text-decoration:underline;background:none;border:none;cursor:pointer}
 
-  /* Vista Próximos meses */
-  #vista-proximos{display:none}
-  body.modo-proximos #vista-form{display:none}
-  body.modo-proximos #vista-proximos{display:block}
+  /* Vistas */
+  #vista-resumen,#vista-proximos{display:none}
+  body.v-resumen #vista-form, body.v-proximos #vista-form{display:none}
+  body.v-resumen #vista-resumen{display:block}
+  body.v-proximos #vista-proximos{display:block}
+
   .clave-gate{margin:24px 0;text-align:center}
   .clave-gate input{width:100%;max-width:260px;background:var(--panel);border:1px solid var(--line);
     border-radius:12px;color:var(--txt);font-size:16px;padding:13px 14px;outline:none;text-align:center}
   .clave-gate button{margin-top:10px;padding:12px 26px;border:none;border-radius:12px;
     background:var(--accent);color:#fff;font-size:15px;font-weight:700;cursor:pointer}
-  .mes-card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin:10px 0}
-  .mes-card h3{margin:0 0 4px;font-size:14px;letter-spacing:.6px;color:var(--dim);text-transform:uppercase}
-  .mes-card .total{font-size:26px;font-weight:800;margin-bottom:8px}
-  .mes-item{display:flex;justify-content:space-between;gap:8px;font-size:13.5px;color:var(--dim);padding:3px 0}
-  .mes-item span:last-child{color:var(--txt);font-weight:600;white-space:nowrap}
+
+  .mes-card,.res-card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin:10px 0}
+  .mes-card h3,.res-card h3{margin:0 0 4px;font-size:13px;letter-spacing:.6px;color:var(--dim);text-transform:uppercase}
+  .mes-card .total,.res-card .total{font-size:26px;font-weight:800;margin-bottom:6px}
+  .mes-item,.res-item{display:flex;justify-content:space-between;gap:8px;font-size:13.5px;color:var(--dim);padding:3px 0}
+  .mes-item span:last-child,.res-item span:last-child{color:var(--txt);font-weight:600;white-space:nowrap}
+  .res-item .lnk{color:var(--accent);cursor:pointer;text-decoration:underline}
   .prox-nota{font-size:12px;color:var(--dim);text-align:center;margin:10px 0}
-  #cambiar-clave{background:none;border:none;color:var(--dim);font-size:11.5px;text-decoration:underline;cursor:pointer;display:block;margin:8px auto 0}
+  .cambiar-clave{background:none;border:none;color:var(--dim);font-size:11.5px;text-decoration:underline;cursor:pointer;display:block;margin:8px auto 0}
+
+  #foto-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:50;
+    align-items:center;justify-content:center;flex-direction:column;gap:10px}
+  #foto-overlay.show{display:flex}
+  #foto-overlay img{max-width:96vw;max-height:86vh;border-radius:10px}
+  #foto-overlay span{color:var(--dim);font-size:13px}
 </style>
 </head>
 <body>
 <header>
   <div class="logo">AS</div>
-  <h1><b>Gasto de obra</b> · Apex Sync</h1>
-  <button id="ver-proximos">Próximos →</button>
+  <h1><b>Obras</b> · Apex Sync</h1>
+  <button class="nav-btn" id="nav-resumen">📊 Resumen</button>
+  <button class="nav-btn" id="nav-proximos">📅 Próximos</button>
 </header>
 
 <div id="vista-form">
@@ -165,21 +179,35 @@
     </div>
   </div>
 
+  <button id="btn-foto" class="chip">📷 Foto de la factura</button>
+  <input id="foto-input" type="file" accept="image/*" hidden>
   <button id="recurrente" class="chip">🔁 Se repite todos los meses</button>
 
   <button id="guardar">Guardar gasto</button>
 </div>
 
+<div id="vista-resumen">
+  <div id="gate-resumen" class="clave-gate" hidden>
+    <p style="color:var(--dim);font-size:14px">Clave familiar:</p>
+    <input id="clave-input-r" type="text" autocomplete="off" placeholder="clave">
+    <br><button id="clave-ok-r">Entrar</button>
+  </div>
+  <div id="resumen-cont"></div>
+  <button class="cambiar-clave" id="cambiar-clave-r" hidden>cambiar clave</button>
+</div>
+
 <div id="vista-proximos">
-  <div id="clave-gate" class="clave-gate" hidden>
-    <p style="color:var(--dim);font-size:14px">Clave familiar para ver la proyección:</p>
-    <input id="clave-input" type="text" autocomplete="off" placeholder="clave">
-    <br><button id="clave-ok">Entrar</button>
+  <div id="gate-proximos" class="clave-gate" hidden>
+    <p style="color:var(--dim);font-size:14px">Clave familiar:</p>
+    <input id="clave-input-p" type="text" autocomplete="off" placeholder="clave">
+    <br><button id="clave-ok-p">Entrar</button>
   </div>
   <div id="meses"></div>
   <p class="prox-nota" id="prox-nota" hidden>Suma cuotas pendientes + gastos que se repiten. Las cuotas empiezan el mes siguiente a la compra.</p>
-  <button id="cambiar-clave" hidden>cambiar clave</button>
+  <button class="cambiar-clave" id="cambiar-clave-p" hidden>cambiar clave</button>
 </div>
+
+<div id="foto-overlay"><img id="foto-grande" alt="factura"><span>tocá para cerrar</span></div>
 
 <footer>
   Se guarda al instante · Jarvis lo lee y actualiza tus finanzas
@@ -194,11 +222,11 @@ const TABLA = 'gastos_obras';
 const RPC_LISTA = 'gastos_obras_lista';
 const LS_KEY = 'gastos_obras_v1';
 const CLAVE_KEY = 'gastos_obras_clave';
+const H = {'apikey': ANON_KEY, 'Authorization': 'Bearer ' + ANON_KEY};
 
 const NOMBRES = {jose:'José', facu:'Facu', agus:'Agus'};
 const PROYECTOS = {fagu_obra:'Obra FAGU', tafi:'Casa Tafí'};
 
-// Qué métodos puede usar cada uno (regla de la familia)
 const METODOS_POR_PERSONA = {
   jose: ['efectivo','transferencia','credito'],
   facu: ['efectivo','transferencia'],
@@ -234,6 +262,36 @@ recEl.addEventListener('click', () => {
   recEl.classList.toggle('on', sel.recurrente);
 });
 
+// Foto de factura
+const fotoInput = document.getElementById('foto-input');
+const btnFoto = document.getElementById('btn-foto');
+btnFoto.addEventListener('click', () => fotoInput.click());
+fotoInput.addEventListener('change', () => {
+  const hay = fotoInput.files && fotoInput.files.length;
+  btnFoto.classList.toggle('on', !!hay);
+  btnFoto.textContent = hay ? '📷 ✓ Foto lista' : '📷 Foto de la factura';
+});
+
+async function comprimirFoto(file){
+  const img = await createImageBitmap(file);
+  const max = 1600;
+  const esc = Math.min(1, max / Math.max(img.width, img.height));
+  const c = document.createElement('canvas');
+  c.width = Math.round(img.width * esc);
+  c.height = Math.round(img.height * esc);
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+  return new Promise(res => c.toBlob(res, 'image/jpeg', 0.8));
+}
+
+async function subirFoto(file, fecha){
+  const blob = await comprimirFoto(file);
+  const path = 'obras/' + fecha + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.jpg';
+  const r = await fetch(SUPABASE_URL + '/storage/v1/object/facturas/' + path, {
+    method:'POST', headers:{...H, 'Content-Type':'image/jpeg'}, body: blob,
+  });
+  return r.ok ? path : null;
+}
+
 function aplicarReglaMetodos(){
   const permitidos = METODOS_POR_PERSONA[sel.quien];
   const box = document.getElementById('chips-metodo');
@@ -250,7 +308,6 @@ function aplicarReglaMetodos(){
 }
 aplicarReglaMetodos();
 
-// Monto con puntos de miles mientras tipea (es-AR)
 const montoEl = document.getElementById('monto');
 montoEl.addEventListener('input', () => {
   const n = montoEl.value.replace(/\D/g,'');
@@ -270,12 +327,7 @@ function escribirLS(a){ localStorage.setItem(LS_KEY, JSON.stringify(a)); }
 async function postSupabase(g){
   const r = await fetch(SUPABASE_URL + '/rest/v1/' + TABLA, {
     method:'POST',
-    headers:{
-      'apikey': ANON_KEY,
-      'Authorization': 'Bearer ' + ANON_KEY,
-      'Content-Type': 'application/json',
-      'Prefer': 'return=minimal',
-    },
+    headers:{...H, 'Content-Type':'application/json', 'Prefer':'return=minimal'},
     body: JSON.stringify(g),
   });
   return r.status === 201;
@@ -311,6 +363,13 @@ btn.addEventListener('click', async () => {
       ? (document.getElementById('tarjeta-otra').value.trim() || 'Otra')
       : sel.tarjeta;
   }
+  btn.disabled = true; btn.textContent = 'Guardando…';
+
+  let foto_path = null;
+  if(fotoInput.files && fotoInput.files.length){
+    try{ foto_path = await subirFoto(fotoInput.files[0], fechaEl.value || hoyLocal()); }catch(e){}
+  }
+
   const gasto = {
     fecha: fechaEl.value || hoyLocal(),
     monto: monto,
@@ -321,9 +380,9 @@ btn.addEventListener('click', async () => {
     tarjeta: tarjeta,
     cuotas: esCredito ? sel.cuotas : 1,
     es_recurrente: sel.recurrente,
+    foto_path: foto_path,
   };
 
-  btn.disabled = true; btn.textContent = 'Guardando…';
   const hist = leerLS();
   const item = {...gasto, estado:'pendiente', local_id: Date.now()};
   hist.push(item); escribirLS(hist);
@@ -332,15 +391,17 @@ btn.addEventListener('click', async () => {
   try{ ok = await postSupabase(gasto); }catch(e){}
   if(ok){ item.estado = 'ok'; escribirLS(hist); }
 
+  const fotoFallo = fotoInput.files.length && !foto_path;
   if(navigator.vibrate) navigator.vibrate(ok ? 30 : [60,60,60]);
   btn.classList.add('ok');
-  btn.textContent = ok ? '✓ Guardado' : '✓ Guardado acá (sincroniza después)';
+  btn.textContent = ok ? (fotoFallo ? '✓ Guardado (foto no subió)' : '✓ Guardado') : '✓ Guardado acá (sincroniza después)';
   setTimeout(() => {
     btn.classList.remove('ok'); btn.disabled = false; btn.textContent = 'Guardar gasto';
     montoEl.value = ''; document.getElementById('descripcion').value = '';
     fechaEl.value = hoyLocal();
     sel.recurrente = false; recEl.classList.remove('on');
-  }, 1300);
+    fotoInput.value = ''; btnFoto.classList.remove('on'); btnFoto.textContent = '📷 Foto de la factura';
+  }, 1500);
   refrescarPendientes();
 });
 
@@ -353,55 +414,110 @@ document.getElementById('exportar').addEventListener('click', () => {
   a.click();
 });
 
-// ---------- Vista Próximos meses ----------
+// ---------- Vistas (Resumen / Próximos) ----------
 const fmt$ = n => '$' + Math.round(n).toLocaleString('es-AR');
+let vista = 'form';
 
-document.getElementById('ver-proximos').addEventListener('click', () => {
-  const enProximos = document.body.classList.toggle('modo-proximos');
-  document.getElementById('ver-proximos').textContent = enProximos ? '← Cargar gasto' : 'Próximos →';
-  if(enProximos) abrirProximos();
-});
+function setVista(v){
+  vista = (vista === v) ? 'form' : v;
+  document.body.className = vista === 'form' ? '' : 'v-' + vista;
+  document.getElementById('nav-resumen').classList.toggle('act', vista === 'resumen');
+  document.getElementById('nav-proximos').classList.toggle('act', vista === 'proximos');
+  if(vista === 'resumen') abrirVista('resumen');
+  if(vista === 'proximos') abrirVista('proximos');
+}
+document.getElementById('nav-resumen').addEventListener('click', () => setVista('resumen'));
+document.getElementById('nav-proximos').addEventListener('click', () => setVista('proximos'));
 
-document.getElementById('clave-ok').addEventListener('click', () => {
-  const v = document.getElementById('clave-input').value.trim();
-  if(!v) return;
-  localStorage.setItem(CLAVE_KEY, v);
-  abrirProximos();
-});
-document.getElementById('cambiar-clave').addEventListener('click', () => {
-  localStorage.removeItem(CLAVE_KEY);
-  abrirProximos();
-});
+document.getElementById('clave-ok-r').addEventListener('click', () => guardarClave('clave-input-r','resumen'));
+document.getElementById('clave-ok-p').addEventListener('click', () => guardarClave('clave-input-p','proximos'));
+document.getElementById('cambiar-clave-r').addEventListener('click', () => { localStorage.removeItem(CLAVE_KEY); abrirVista('resumen'); });
+document.getElementById('cambiar-clave-p').addEventListener('click', () => { localStorage.removeItem(CLAVE_KEY); abrirVista('proximos'); });
 
-async function abrirProximos(){
-  const gate = document.getElementById('clave-gate');
-  const meses = document.getElementById('meses');
-  const clave = localStorage.getItem(CLAVE_KEY);
-  document.getElementById('prox-nota').hidden = true;
-  document.getElementById('cambiar-clave').hidden = true;
-  if(!clave){ gate.hidden = false; meses.innerHTML = ''; return; }
-  gate.hidden = true;
-  meses.innerHTML = '<p class="prox-nota">Cargando…</p>';
-  let filas = [];
-  try{
-    const r = await fetch(SUPABASE_URL + '/rest/v1/rpc/' + RPC_LISTA, {
-      method:'POST',
-      headers:{'apikey':ANON_KEY,'Authorization':'Bearer '+ANON_KEY,'Content-Type':'application/json'},
-      body: JSON.stringify({clave}),
-    });
-    filas = await r.json();
-    if(!Array.isArray(filas)) filas = [];
-  }catch(e){ meses.innerHTML = '<p class="prox-nota">Sin conexión — probá de nuevo.</p>'; return; }
-  if(!filas.length){
-    meses.innerHTML = '<p class="prox-nota">Sin datos (¿la clave está bien?).</p>';
-    document.getElementById('cambiar-clave').hidden = false;
-    return;
-  }
-  render(proyectar(filas));
-  document.getElementById('prox-nota').hidden = false;
-  document.getElementById('cambiar-clave').hidden = false;
+function guardarClave(inputId, v){
+  const val = document.getElementById(inputId).value.trim();
+  if(!val) return;
+  localStorage.setItem(CLAVE_KEY, val);
+  abrirVista(v);
 }
 
+async function traerFilas(){
+  const clave = localStorage.getItem(CLAVE_KEY);
+  if(!clave) return null;
+  const r = await fetch(SUPABASE_URL + '/rest/v1/rpc/' + RPC_LISTA, {
+    method:'POST',
+    headers:{...H, 'Content-Type':'application/json'},
+    body: JSON.stringify({clave}),
+  });
+  const filas = await r.json();
+  return Array.isArray(filas) ? filas : [];
+}
+
+async function abrirVista(v){
+  const gate = document.getElementById(v === 'resumen' ? 'gate-resumen' : 'gate-proximos');
+  const cont = document.getElementById(v === 'resumen' ? 'resumen-cont' : 'meses');
+  const cambiar = document.getElementById(v === 'resumen' ? 'cambiar-clave-r' : 'cambiar-clave-p');
+  if(v === 'proximos') document.getElementById('prox-nota').hidden = true;
+  cambiar.hidden = true;
+  if(!localStorage.getItem(CLAVE_KEY)){ gate.hidden = false; cont.innerHTML = ''; return; }
+  gate.hidden = true;
+  cont.innerHTML = '<p class="prox-nota">Cargando…</p>';
+  let filas;
+  try{ filas = await traerFilas(); }
+  catch(e){ cont.innerHTML = '<p class="prox-nota">Sin conexión — probá de nuevo.</p>'; return; }
+  if(!filas.length){
+    cont.innerHTML = '<p class="prox-nota">Sin datos (¿la clave está bien?).</p>';
+    cambiar.hidden = false;
+    return;
+  }
+  if(v === 'resumen') renderResumen(filas); else { renderMeses(proyectar(filas)); document.getElementById('prox-nota').hidden = false; }
+  cambiar.hidden = false;
+}
+
+// ----- Resumen -----
+function renderResumen(filas){
+  const cont = document.getElementById('resumen-cont');
+  const total = filas.reduce((s, f) => s + Number(f.monto), 0);
+  const porQuien = {}, porProy = {};
+  for(const f of filas){
+    porQuien[f.quien] = (porQuien[f.quien] || 0) + Number(f.monto);
+    porProy[f.proyecto] = (porProy[f.proyecto] || 0) + Number(f.monto);
+  }
+  let html = '<div class="res-card"><h3>Inversión global</h3><div class="total">' + fmt$(total) + '</div>' +
+    Object.entries(porProy).map(([p, v]) => '<div class="res-item"><span>' + (PROYECTOS[p] || p) + '</span><span>' + fmt$(v) + '</span></div>').join('') +
+    '</div>';
+  html += '<div class="res-card"><h3>Cuánto puso cada uno</h3>' +
+    ['jose','facu','agus'].filter(q => porQuien[q]).map(q =>
+      '<div class="res-item"><span>' + NOMBRES[q] + '</span><span>' + fmt$(porQuien[q]) + '</span></div>').join('') +
+    '</div>';
+  const orden = [...filas].sort((a, b) => b.fecha.localeCompare(a.fecha) || b.id - a.id);
+  html += '<div class="res-card"><h3>Qué se compró</h3>' +
+    orden.map(f => {
+      const [y, m, d] = f.fecha.split('-');
+      const extra = (f.cuotas > 1 ? ' · ' + f.cuotas + ' cuotas' : '') + (f.es_recurrente ? ' · 🔁' : '');
+      const foto = f.foto_path ? ' <span class="lnk" data-foto="' + f.foto_path + '">📎</span>' : '';
+      return '<div class="res-item"><span>' + Number(d) + '/' + Number(m) + ' · ' + (f.descripcion || '(sin detalle)') +
+        ' · ' + (NOMBRES[f.quien] || f.quien) + extra + foto + '</span><span>' + fmt$(Number(f.monto)) + '</span></div>';
+    }).join('') +
+    '</div>';
+  cont.innerHTML = html;
+  cont.querySelectorAll('[data-foto]').forEach(el => el.addEventListener('click', () => verFoto(el.dataset.foto)));
+}
+
+async function verFoto(path){
+  try{
+    const r = await fetch(SUPABASE_URL + '/storage/v1/object/facturas/' + path, {headers: H});
+    if(!r.ok) return;
+    const url = URL.createObjectURL(await r.blob());
+    document.getElementById('foto-grande').src = url;
+    document.getElementById('foto-overlay').classList.add('show');
+  }catch(e){}
+}
+document.getElementById('foto-overlay').addEventListener('click', () => {
+  document.getElementById('foto-overlay').classList.remove('show');
+});
+
+// ----- Próximos -----
 function proyectar(filas){
   const hoy = new Date();
   const meses = [];
@@ -433,7 +549,7 @@ function proyectar(filas){
   return meses;
 }
 
-function render(meses){
+function renderMeses(meses){
   const cont = document.getElementById('meses');
   cont.innerHTML = '';
   let algo = false;

@@ -1,6 +1,6 @@
 // Service worker mínimo: cachea el shell para abrir offline.
 // Los POST a Supabase nunca pasan por acá (solo GET same-origin).
-const CACHE = 'gastos-obras-v3';
+const CACHE = 'gastos-obras-v4';
 const SHELL = ['.', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {
