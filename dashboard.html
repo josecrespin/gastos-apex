@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Resumen · Obras · Apex Sync</title>
+<meta name="theme-color" content="#0B0C0F">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="stylesheet" href="apex-sync.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="logo">AS</div>
+  <h1><b>Resumen</b> · Obras</h1>
+  <button class="icon-btn" id="refrescar">↻ Actualizar</button>
+</header>
+
+<main id="dash">
+  <div id="gate" class="gate" hidden>
+    <p>Clave familiar para ver el resumen:</p>
+    <input id="clave-input" class="field" type="text" autocomplete="off" placeholder="clave">
+    <button id="clave-ok" class="btn-primary">Entrar</button>
+  </div>
+  <div id="contenido"></div>
+  <button class="cambiar-clave" id="cambiar-clave" hidden>cambiar clave</button>
+  <p class="pie" id="actualizado"></p>
+</main>
+
+<nav class="tabbar">
+  <a class="tab" href="index.html"><span class="ico">＋</span>Cargar</a>
+  <button class="tab act"><span class="ico">▤</span>Resumen</button>
+  <a class="tab" href="index.html#proximos"><span class="ico">▦</span>Próximos</a>
+</nav>
+
+<div class="overlay" id="foto-overlay"><img id="foto-grande" alt="factura"><span>tocá para cerrar</span></div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+const SUPABASE_URL = 'https://kfiywiqivibktzakclyv.supabase.co';
+const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtmaXl3aXFpdmlia3R6YWtjbHl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyMTA1MTgsImV4cCI6MjA5ODc4NjUxOH0.Z1DQW5ySGolzrjsqeesg824cpctqa04BOS2RSH4NTNo';
+const RPC_LISTA = 'gastos_obras_lista';
+const CLAVE_KEY = 'gastos_obras_clave';   // misma clave que la app de carga
+const H = {'apikey': ANON_KEY, 'Authorization': 'Bearer ' + ANON_KEY};
+
+const NOMBRES = {jose:'José', facu:'Facu', agus:'Agus'};
+const INICIAL = {jose:'J', facu:'F', agus:'A'};
+const PROYECTOS = {fagu_obra:'Obra FAGU', tafi:'Casa Tafí'};
+const PROY_CLASE = {fagu_obra:'obra', tafi:'tafi'};
+const METODO_TXT = {efectivo:'Efectivo', transferencia:'Transferencia', debito:'Débito', credito:'Crédito'};
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt$ = n => '$ ' + Math.round(n).toLocaleString('es-AR');
+
+let toastTimer = null;
+function toast(msg, tipo){
+  const t = $('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (tipo ? ' toast--' + tipo : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3200);
+}
+
+$('clave-ok').addEventListener('click', () => {
+  const v = $('clave-input').value.trim();
+  if(!v) return;
+  localStorage.setItem(CLAVE_KEY, v);
+  cargar();
+});
+$('cambiar-clave').addEventListener('click', () => { localStorage.removeItem(CLAVE_KEY); cargar(); });
+$('refrescar').addEventListener('click', () => cargar());
+
+async function traerFilas(){
+  const clave = localStorage.getItem(CLAVE_KEY);
+  const r = await fetch(SUPABASE_URL + '/rest/v1/rpc/' + RPC_LISTA, {
+    method:'POST',
+    headers:{...H, 'Content-Type':'application/json'},
+    body: JSON.stringify({clave}),
+  });
+  if(!r.ok) throw new Error('server');
+  const filas = await r.json();
+  return Array.isArray(filas) ? filas : [];
+}
+
+async function cargar(){
+  const cont = $('contenido');
+  $('cambiar-clave').hidden = true;
+  $('actualizado').textContent = '';
+  if(!localStorage.getItem(CLAVE_KEY)){
+    $('gate').hidden = false; cont.innerHTML = ''; return;
+  }
+  $('gate').hidden = true;
+  cont.innerHTML = '<div class="vacio">Cargando…</div>';
+  let filas;
+  try{ filas = await traerFilas(); }
+  catch(e){
+    cont.innerHTML = '<div class="vacio"><b>' + (e.message === 'server' ? 'Error del servidor' : 'Sin conexión') + '</b>Tocá ↻ Actualizar para probar de nuevo.</div>';
+    toast('No se pudieron traer los datos', 'error');
+    return;
+  }
+  if(!filas.length){
+    cont.innerHTML = '<div class="vacio"><b>Sin datos</b>¿La clave está bien?</div>';
+    $('cambiar-clave').hidden = false;
+    return;
+  }
+  render(filas);
+  $('cambiar-clave').hidden = false;
+  $('actualizado').textContent = 'Actualizado ' + new Date().toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'});
+}
+
+// Regla: TODA compra a crédito impacta los meses siguientes (aun en 1 cuota).
+// Crédito + recurrente: manda el crédito (sin doble conteo).
+function proyectar(filas){
+  const hoy = new Date();
+  const meses = [];
+  for(let k = 0; k < 6; k++){
+    const d = new Date(hoy.getFullYear(), hoy.getMonth() + k, 1);
+    meses.push({y: d.getFullYear(), m: d.getMonth(), items: []});
+  }
+  const idx = (y, m) => (y - meses[0].y) * 12 + (m - meses[0].m);
+  for(const f of filas){
+    const [fy, fm] = f.fecha.split('-').map(Number);
+    const base = idx(fy, fm - 1);
+    const etiqueta = f.descripcion || '(sin detalle)';
+    const esCredito = f.metodo === 'credito';
+    if(f.es_recurrente && !esCredito){
+      for(let k = Math.max(0, base + 1); k < meses.length; k++)
+        meses[k].items.push({t: etiqueta, rec:true, v: Number(f.monto)});
+    }
+    if(esCredito){
+      const n = Math.max(1, Number(f.cuotas) || 1);
+      const cuota = Number(f.monto) / n;
+      for(let i = 1; i <= n; i++){
+        const k = base + i;
+        if(k >= 0 && k < meses.length)
+          meses[k].items.push({t: etiqueta, cuota: i + '/' + n, v: cuota});
+      }
+    }
+  }
+  return meses;
+}
+
+function render(filas){
+  const total = filas.reduce((s, f) => s + Number(f.monto), 0);
+  const porQuien = {jose:0, facu:0, agus:0};
+  const porProy = {};
+  const nProy = {};
+  for(const f of filas){
+    porQuien[f.quien] = (porQuien[f.quien] || 0) + Number(f.monto);
+    porProy[f.proyecto] = (porProy[f.proyecto] || 0) + Number(f.monto);
+    nProy[f.proyecto] = (nProy[f.proyecto] || 0) + 1;
+  }
+  const pct = q => total ? (porQuien[q] / total * 100) : 0;
+
+  // HERO: total + barra apilada por hermano
+  let html =
+    '<section class="hero">' +
+      '<div class="etiqueta">Total invertido</div>' +
+      '<div class="total money">' + fmt$(total) + '</div>' +
+      '<div class="stacked" role="img" aria-label="' +
+        ['jose','facu','agus'].map(q => NOMBRES[q] + ' ' + Math.round(pct(q)) + '%').join(', ') + '">' +
+        ['jose','facu','agus'].filter(q => porQuien[q] > 0).map(q =>
+          '<i style="width:' + pct(q).toFixed(1) + '%; background:var(--p-' + q + ')"></i>').join('') +
+      '</div>' +
+      '<div class="leyenda">' +
+        ['jose','facu','agus'].map(q =>
+          '<span><i style="background:var(--p-' + q + ')"></i>' + NOMBRES[q] + ' <b>' + fmt$(porQuien[q] || 0) + '</b></span>').join('') +
+      '</div>' +
+    '</section>';
+
+  // POR PROYECTO
+  const proys = ['fagu_obra','tafi'].filter(p => porProy[p]);
+  if(proys.length){
+    html += '<div class="stat-grid">' + proys.map(p =>
+      '<div class="stat-card stat-card--' + PROY_CLASE[p] + '">' +
+        '<div class="lbl">' + esc(PROYECTOS[p] || p) + '</div>' +
+        '<div class="val money">' + fmt$(porProy[p]) + '</div>' +
+        '<div class="sub">' + nProy[p] + ' gasto' + (nProy[p] === 1 ? '' : 's') + '</div>' +
+      '</div>').join('') + '</div>';
+  }
+
+  // CUÁNTO PUSO CADA UNO
+  const maxQuien = Math.max(...Object.values(porQuien), 1);
+  html +=
+    '<section class="card"><h3>Cuánto puso cada uno</h3><div class="bars">' +
+    ['jose','facu','agus'].map(q =>
+      '<div class="bar-row bar-row--' + q + '">' +
+        '<span class="quien">' + NOMBRES[q] + '</span>' +
+        '<div class="bar-track"><div class="bar-fill" style="--w:' + ((porQuien[q] || 0) / maxQuien * 100).toFixed(1) + '%"></div></div>' +
+        '<span class="cuanto">' + fmt$(porQuien[q] || 0) + '</span>' +
+      '</div>').join('') +
+    '</div></section>';
+
+  // COMPROMISOS QUE VIENEN
+  const meses = proyectar(filas).filter(m => m.items.length);
+  html += '<div class="seccion"><h2>Compromisos que vienen</h2></div>';
+  if(meses.length){
+    html += meses.map(mes => {
+      const t = mes.items.reduce((s, i) => s + i.v, 0);
+      let nombre = new Date(mes.y, mes.m, 1).toLocaleDateString('es-AR', {month:'long'});
+      nombre = nombre.charAt(0).toUpperCase() + nombre.slice(1);
+      if(mes.y !== new Date().getFullYear()) nombre += ' ' + mes.y;
+      return '<div class="mes-card">' +
+        '<div class="mes-head"><span class="mes-nombre">' + esc(nombre) + '</span><span class="mes-total money">' + fmt$(t) + '</span></div>' +
+        mes.items.map(i =>
+          '<div class="mes-item"><span>' + (i.rec ? '🔁 ' : '') + esc(i.t) + '</span>' +
+          (i.cuota ? '<span class="cuota-n">' + i.cuota + '</span>' : '') +
+          '<b class="money">' + fmt$(i.v) + '</b></div>').join('') +
+        '</div>';
+    }).join('');
+  } else {
+    html += '<div class="vacio"><b>Nada proyectado</b>Sin cuotas pendientes ni gastos recurrentes.</div>';
+  }
+
+  // ÚLTIMAS COMPRAS
+  html += '<div class="seccion"><h2>Últimas compras</h2></div>';
+  const orden = [...filas].sort((a, b) => b.fecha.localeCompare(a.fecha) || b.id - a.id);
+  html += orden.map(f => {
+    const [y, m, d] = f.fecha.split('-').map(Number);
+    const fbon = d + ' ' + new Date(y, m - 1, d).toLocaleDateString('es-AR', {month:'short'}).replace('.','');
+    const badge = f.metodo === 'credito'
+      ? '<span class="badge badge--credito">Crédito ' + (Number(f.cuotas) || 1) + '×</span>'
+      : '<span class="badge">' + (METODO_TXT[f.metodo] || esc(f.metodo)) + '</span>';
+    const extra = f.tarjeta ? '<span class="extra">' + esc(f.tarjeta) + '</span>' : '';
+    const rec = f.es_recurrente ? '<span class="badge badge--recurrente">🔁 fijo</span>' : '';
+    const foto = f.foto_path ? '<span class="extra" style="cursor:pointer" data-foto="' + esc(f.foto_path) + '">📎 factura</span>' : '';
+    return '<div class="gasto gasto--' + (PROY_CLASE[f.proyecto] || 'obra') + '">' +
+      '<div class="avatar avatar--' + esc(f.quien) + '">' + (INICIAL[f.quien] || '?') + '</div>' +
+      '<div class="info"><div class="desc">' + esc(f.descripcion || '(sin detalle)') + '</div>' +
+      '<div class="meta">' + badge + extra + rec + foto + '</div></div>' +
+      '<div class="importe"><div class="m money">' + fmt$(Number(f.monto)) + '</div><div class="f">' + fbon + '</div></div>' +
+    '</div>';
+  }).join('');
+
+  $('contenido').innerHTML = html;
+  $('contenido').querySelectorAll('[data-foto]').forEach(el =>
+    el.addEventListener('click', () => verFoto(el.dataset.foto)));
+}
+
+async function verFoto(path){
+  try{
+    const r = await fetch(SUPABASE_URL + '/storage/v1/object/facturas/' + path, {headers: H});
+    if(!r.ok){ toast('No se pudo abrir la foto', 'error'); return; }
+    const url = URL.createObjectURL(await r.blob());
+    $('foto-grande').src = url;
+    $('foto-overlay').classList.add('show');
+  }catch(e){ toast('No se pudo abrir la foto', 'error'); }
+}
+$('foto-overlay').addEventListener('click', () => $('foto-overlay').classList.remove('show'));
+
+cargar();
+if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+</script>
+</body>
+</html>

@@ -4,145 +4,55 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <title>Obras · Apex Sync</title>
-<meta name="theme-color" content="#0c0d10">
+<meta name="theme-color" content="#0B0C0F">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Obras AS">
-<style>
-  :root{
-    --bg:#0c0d10; --panel:#15171c; --line:#23262e;
-    --txt:#f2f3f5; --dim:#8b909c;
-    --accent:#4f7cff; --accent2:#3b5fd9;
-    --ok:#2ecc71; --warn:#f0a92e;
-  }
-  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
-  html,body{margin:0; padding:0; background:var(--bg); color:var(--txt);
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
-  body{min-height:100dvh; display:flex; flex-direction:column;
-    padding:env(safe-area-inset-top) 16px calc(env(safe-area-inset-bottom) + 12px)}
-  header{display:flex; align-items:center; gap:8px; padding:14px 2px 6px}
-  .logo{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--accent),var(--accent2));
-    display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;letter-spacing:.5px;flex:none}
-  header h1{font-size:15px;font-weight:600;margin:0;color:var(--dim);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  header h1 b{color:var(--txt);font-weight:700}
-  .nav-btn{background:none;border:1px solid var(--line);border-radius:10px;
-    color:var(--accent);font-size:12.5px;font-weight:700;padding:7px 9px;cursor:pointer;flex:none}
-  .nav-btn.act{background:var(--accent);color:#fff;border-color:var(--accent)}
-
-  .monto-wrap{padding:14px 0 4px;text-align:center}
-  .monto-box{display:flex;align-items:baseline;justify-content:center;gap:6px}
-  .monto-box .signo{font-size:30px;color:var(--dim);font-weight:600}
-  #monto{font-size:52px;font-weight:800;background:none;border:none;color:var(--txt);
-    width:100%;max-width:260px;text-align:center;outline:none;padding:0;caret-color:var(--accent)}
-  #monto::placeholder{color:#3a3e48}
-
-  .campo{margin:10px 0}
-  #descripcion{width:100%;background:var(--panel);border:1px solid var(--line);border-radius:12px;
-    color:var(--txt);font-size:16px;padding:13px 14px;outline:none}
-  #descripcion:focus{border-color:var(--accent)}
-  #descripcion::placeholder{color:var(--dim)}
-  .fila-fecha{display:flex;align-items:center;gap:10px;margin:10px 0 0}
-  .fila-fecha label{font-size:11px;font-weight:700;letter-spacing:1.2px;color:var(--dim)}
-  #fecha{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:12px;
-    color:var(--txt);font-size:15px;padding:10px 12px;outline:none;color-scheme:dark}
-
-  .grupo{margin:14px 0 0}
-  .grupo label{display:block;font-size:11px;font-weight:700;letter-spacing:1.2px;color:var(--dim);margin:0 0 8px 2px}
-  .chips{display:flex;gap:8px;flex-wrap:wrap}
-  .chip{flex:1 1 auto;min-width:88px;padding:11px 10px;border-radius:12px;border:1px solid var(--line);
-    background:var(--panel);color:var(--txt);font-size:14.5px;font-weight:600;text-align:center;cursor:pointer;
-    transition:background .12s,border-color .12s}
-  .chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
-  .chip.off{opacity:.32;pointer-events:none}
-  .chips.cuotas .chip{min-width:52px;flex:1 1 0}
-  #recurrente{width:100%;margin-top:14px}
-  #recurrente.on{background:var(--warn);border-color:var(--warn);color:#1a1305}
-  #btn-foto{width:100%;margin-top:10px}
-  #btn-foto.on{background:var(--ok);border-color:var(--ok);color:#062712}
-
-  #credito-extra{display:none}
-  #credito-extra.show{display:block}
-  #tarjeta-otra{display:none;margin-top:8px;width:100%;background:var(--panel);border:1px solid var(--line);
-    border-radius:12px;color:var(--txt);font-size:15px;padding:11px 13px;outline:none}
-  #tarjeta-otra.show{display:block}
-
-  #guardar{margin-top:20px;width:100%;padding:17px;border:none;border-radius:14px;
-    background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;
-    font-size:17px;font-weight:800;letter-spacing:.3px;cursor:pointer;transition:transform .08s,opacity .2s}
-  #guardar:active{transform:scale(.985)}
-  #guardar.ok{background:var(--ok)}
-  #guardar:disabled{opacity:.6}
-
-  footer{margin-top:auto;padding-top:18px;text-align:center;font-size:12.5px;color:var(--dim)}
-  #pendientes{display:none;margin-top:6px;font-size:12px;color:var(--warn)}
-  #pendientes.show{display:block}
-  #exportar{margin-top:8px;font-size:12px;color:var(--dim);text-decoration:underline;background:none;border:none;cursor:pointer}
-
-  /* Vistas */
-  #vista-resumen,#vista-proximos{display:none}
-  body.v-resumen #vista-form, body.v-proximos #vista-form{display:none}
-  body.v-resumen #vista-resumen{display:block}
-  body.v-proximos #vista-proximos{display:block}
-
-  .clave-gate{margin:24px 0;text-align:center}
-  .clave-gate input{width:100%;max-width:260px;background:var(--panel);border:1px solid var(--line);
-    border-radius:12px;color:var(--txt);font-size:16px;padding:13px 14px;outline:none;text-align:center}
-  .clave-gate button{margin-top:10px;padding:12px 26px;border:none;border-radius:12px;
-    background:var(--accent);color:#fff;font-size:15px;font-weight:700;cursor:pointer}
-
-  .mes-card,.res-card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin:10px 0}
-  .mes-card h3,.res-card h3{margin:0 0 4px;font-size:13px;letter-spacing:.6px;color:var(--dim);text-transform:uppercase}
-  .mes-card .total,.res-card .total{font-size:26px;font-weight:800;margin-bottom:6px}
-  .mes-item,.res-item{display:flex;justify-content:space-between;gap:8px;font-size:13.5px;color:var(--dim);padding:3px 0}
-  .mes-item span:last-child,.res-item span:last-child{color:var(--txt);font-weight:600;white-space:nowrap}
-  .res-item .lnk{color:var(--accent);cursor:pointer;text-decoration:underline}
-  .prox-nota{font-size:12px;color:var(--dim);text-align:center;margin:10px 0}
-  .cambiar-clave{background:none;border:none;color:var(--dim);font-size:11.5px;text-decoration:underline;cursor:pointer;display:block;margin:8px auto 0}
-
-  #foto-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:50;
-    align-items:center;justify-content:center;flex-direction:column;gap:10px}
-  #foto-overlay.show{display:flex}
-  #foto-overlay img{max-width:96vw;max-height:86vh;border-radius:10px}
-  #foto-overlay span{color:var(--dim);font-size:13px}
-</style>
+<link rel="stylesheet" href="apex-sync.css">
 </head>
 <body>
-<header>
+
+<header class="topbar">
   <div class="logo">AS</div>
   <h1><b>Obras</b> · Apex Sync</h1>
-  <button class="nav-btn" id="nav-resumen">📊 Resumen</button>
-  <button class="nav-btn" id="nav-proximos">📅 Próximos</button>
+  <span class="periodo" id="periodo"></span>
 </header>
 
-<div id="vista-form">
+<!-- ============ CARGAR ============ -->
+<main id="vista-cargar">
   <div class="monto-wrap">
     <div class="monto-box">
       <span class="signo">$</span>
-      <input id="monto" type="text" inputmode="numeric" autocomplete="off" placeholder="0">
+      <input id="monto" class="monto money" type="text" inputmode="numeric" autocomplete="off" placeholder="0" aria-label="Monto">
     </div>
   </div>
 
-  <div class="campo">
-    <input id="descripcion" type="text" autocomplete="off" placeholder="¿En qué? (ej: membrana, SAT, cemento)">
-  </div>
-
-  <div class="fila-fecha">
-    <label>FECHA</label>
-    <input id="fecha" type="date">
+  <div class="grupo">
+    <input id="descripcion" class="field" type="text" autocomplete="off" placeholder="¿En qué? (ej: membrana, SAT, cemento)">
   </div>
 
   <div class="grupo">
-    <label>OBRA</label>
+    <label>Fecha</label>
+    <div class="chips" id="chips-fecha">
+      <button class="chip on" data-v="hoy">Hoy</button>
+      <button class="chip" data-v="ayer">Ayer</button>
+      <button class="chip" data-v="otra">Otra</button>
+    </div>
+    <input id="fecha" class="field" type="date" style="margin-top:10px" hidden>
+  </div>
+
+  <div class="grupo">
+    <label>Obra</label>
     <div class="chips" id="chips-proyecto">
-      <button class="chip on" data-v="fagu_obra">Obra FAGU</button>
-      <button class="chip" data-v="tafi">Casa Tafí</button>
+      <button class="chip chip--obra on" data-v="fagu_obra">Obra FAGU</button>
+      <button class="chip chip--tafi" data-v="tafi">Casa Tafí</button>
     </div>
   </div>
 
   <div class="grupo">
-    <label>PAGÓ</label>
+    <label>Pagó</label>
     <div class="chips" id="chips-quien">
       <button class="chip on" data-v="jose">Yo</button>
       <button class="chip" data-v="facu">Facu</button>
@@ -151,69 +61,73 @@
   </div>
 
   <div class="grupo">
-    <label>MÉTODO</label>
+    <label>Método</label>
     <div class="chips" id="chips-metodo">
       <button class="chip on" data-v="efectivo">Efectivo</button>
       <button class="chip" data-v="transferencia">Transf.</button>
+      <button class="chip" data-v="debito">Débito</button>
       <button class="chip" data-v="credito">Crédito</button>
     </div>
   </div>
 
-  <div id="credito-extra">
-    <div class="grupo">
-      <label>TARJETA</label>
-      <div class="chips" id="chips-tarjeta">
-        <button class="chip on" data-v="Visa Francés">Visa Francés</button>
-        <button class="chip" data-v="__otra">Otra</button>
-      </div>
-      <input id="tarjeta-otra" type="text" placeholder="¿Qué tarjeta?">
+  <div class="grupo" id="grupo-tarjeta" hidden>
+    <label>Tarjeta</label>
+    <div class="chips" id="chips-tarjeta">
+      <button class="chip on" data-v="Visa Francés BBVA">V. Francés BBVA</button>
+      <button class="chip" data-v="Visa BBVA">V. BBVA</button>
+      <button class="chip" data-v="Nación">Nación</button>
+      <button class="chip" data-v="__otra">Otra</button>
     </div>
-    <div class="grupo">
-      <label>CUOTAS</label>
-      <div class="chips cuotas" id="chips-cuotas">
-        <button class="chip on" data-v="1">1</button>
-        <button class="chip" data-v="3">3</button>
-        <button class="chip" data-v="6">6</button>
-        <button class="chip" data-v="12">12</button>
-      </div>
+    <input id="tarjeta-otra" class="field" type="text" placeholder="¿Qué tarjeta?" style="margin-top:10px" hidden>
+  </div>
+
+  <div class="grupo" id="grupo-cuotas" hidden>
+    <label>Cuotas</label>
+    <div class="chips chips--compact" id="chips-cuotas">
+      <button class="chip on" data-v="1">1</button>
+      <button class="chip" data-v="3">3</button>
+      <button class="chip" data-v="6">6</button>
+      <button class="chip" data-v="12">12</button>
     </div>
   </div>
 
-  <button id="btn-foto" class="chip">📷 Foto de la factura</button>
-  <input id="foto-input" type="file" accept="image/*" hidden>
-  <button id="recurrente" class="chip">🔁 Se repite todos los meses</button>
-
-  <button id="guardar">Guardar gasto</button>
-</div>
-
-<div id="vista-resumen">
-  <div id="gate-resumen" class="clave-gate" hidden>
-    <p style="color:var(--dim);font-size:14px">Clave familiar:</p>
-    <input id="clave-input-r" type="text" autocomplete="off" placeholder="clave">
-    <br><button id="clave-ok-r">Entrar</button>
+  <div class="grupo">
+    <button id="btn-foto" class="chip chip--toggle">📷 Foto de la factura</button>
+    <input id="foto-input" type="file" accept="image/*" hidden>
+    <button id="recurrente" class="chip chip--toggle" style="margin-top:10px">🔁 Se repite todos los meses</button>
   </div>
-  <div id="resumen-cont"></div>
-  <button class="cambiar-clave" id="cambiar-clave-r" hidden>cambiar clave</button>
-</div>
 
-<div id="vista-proximos">
-  <div id="gate-proximos" class="clave-gate" hidden>
-    <p style="color:var(--dim);font-size:14px">Clave familiar:</p>
-    <input id="clave-input-p" type="text" autocomplete="off" placeholder="clave">
-    <br><button id="clave-ok-p">Entrar</button>
+  <button id="guardar" class="btn-primary">Guardar gasto</button>
+
+  <div style="text-align:center"><button class="pendientes" id="pendientes"></button></div>
+
+  <footer class="pie">
+    Se guarda al instante · Jarvis lo lee y actualiza tus finanzas
+    <br><button class="lnk" id="exportar">Exportar respaldo</button>
+  </footer>
+</main>
+
+<!-- ============ PRÓXIMOS ============ -->
+<main id="vista-proximos" hidden>
+  <div id="gate-proximos" class="gate" hidden>
+    <p>Clave familiar:</p>
+    <input id="clave-input" class="field" type="text" autocomplete="off" placeholder="clave">
+    <button id="clave-ok" class="btn-primary">Entrar</button>
   </div>
+  <div class="seccion"><h2>Compromisos que vienen</h2><button class="accion" id="refrescar-prox">↻ Actualizar</button></div>
   <div id="meses"></div>
-  <p class="prox-nota" id="prox-nota" hidden>Suma cuotas pendientes + gastos que se repiten. Las cuotas empiezan el mes siguiente a la compra.</p>
-  <button class="cambiar-clave" id="cambiar-clave-p" hidden>cambiar clave</button>
-</div>
+  <p class="pie" id="prox-nota" hidden>Suma cuotas de crédito + gastos que se repiten. Las cuotas empiezan el mes siguiente a la compra.</p>
+  <button class="cambiar-clave" id="cambiar-clave" hidden>cambiar clave</button>
+</main>
 
-<div id="foto-overlay"><img id="foto-grande" alt="factura"><span>tocá para cerrar</span></div>
+<!-- ============ TABBAR ============ -->
+<nav class="tabbar">
+  <button class="tab act" id="tab-cargar"><span class="ico">＋</span>Cargar</button>
+  <a class="tab" href="dashboard.html"><span class="ico">▤</span>Resumen</a>
+  <button class="tab" id="tab-proximos"><span class="ico">▦</span>Próximos</button>
+</nav>
 
-<footer>
-  Se guarda al instante · Jarvis lo lee y actualiza tus finanzas
-  <div id="pendientes"></div>
-  <button id="exportar">Exportar respaldo</button>
-</footer>
+<div class="toast" id="toast" role="status"></div>
 
 <script>
 const SUPABASE_URL = 'https://kfiywiqivibktzakclyv.supabase.co';
@@ -226,17 +140,48 @@ const H = {'apikey': ANON_KEY, 'Authorization': 'Bearer ' + ANON_KEY};
 
 const NOMBRES = {jose:'José', facu:'Facu', agus:'Agus'};
 const PROYECTOS = {fagu_obra:'Obra FAGU', tafi:'Casa Tafí'};
+const METODO_TXT = {efectivo:'Efectivo', transferencia:'Transferencia', debito:'Débito', credito:'Crédito'};
 
+// Regla de negocio: José usa los 4 métodos; Facu y Agus solo efectivo/transferencia.
 const METODOS_POR_PERSONA = {
-  jose: ['efectivo','transferencia','credito'],
+  jose: ['efectivo','transferencia','debito','credito'],
   facu: ['efectivo','transferencia'],
   agus: ['efectivo','transferencia'],
 };
 
-const sel = { proyecto:'fagu_obra', quien:'jose', metodo:'efectivo', tarjeta:'Visa Francés', cuotas:1, recurrente:false };
+const sel = { fecha:'hoy', proyecto:'fagu_obra', quien:'jose', metodo:'efectivo', tarjeta:'Visa Francés BBVA', cuotas:1, recurrente:false };
 
+// ---------- helpers ----------
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt$ = n => '$ ' + Math.round(n).toLocaleString('es-AR');
+const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(36).slice(2));
+
+let toastTimer = null;
+function toast(msg, tipo){
+  const t = $('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (tipo ? ' toast--' + tipo : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3200);
+}
+
+function isoLocal(d){
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+const hoyLocal = () => isoLocal(new Date());
+function fechaElegida(){
+  if(sel.fecha === 'otra') return $('fecha').value || hoyLocal();
+  if(sel.fecha === 'ayer'){ const d = new Date(); d.setDate(d.getDate()-1); return isoLocal(d); }
+  return hoyLocal();
+}
+
+const mesNombre = new Date().toLocaleDateString('es-AR', {month:'long'});
+$('periodo').textContent = mesNombre.charAt(0).toUpperCase() + mesNombre.slice(1);
+
+// ---------- chips ----------
 function initChips(id, campo, cb){
-  const box = document.getElementById(id);
+  const box = $(id);
   box.addEventListener('click', e => {
     const b = e.target.closest('.chip'); if(!b || b.classList.contains('off')) return;
     box.querySelectorAll('.chip').forEach(c => c.classList.remove('on'));
@@ -246,25 +191,51 @@ function initChips(id, campo, cb){
   });
 }
 
+initChips('chips-fecha','fecha', v => {
+  const f = $('fecha');
+  f.hidden = v !== 'otra';
+  if(v === 'otra' && !f.value) f.value = hoyLocal();
+});
 initChips('chips-proyecto','proyecto');
 initChips('chips-quien','quien', aplicarReglaMetodos);
-initChips('chips-metodo','metodo', v => {
-  document.getElementById('credito-extra').classList.toggle('show', v === 'credito');
-});
-initChips('chips-tarjeta','tarjeta', v => {
-  document.getElementById('tarjeta-otra').classList.toggle('show', v === '__otra');
-});
+initChips('chips-metodo','metodo', aplicarGruposTarjeta);
+initChips('chips-tarjeta','tarjeta', v => { $('tarjeta-otra').hidden = v !== '__otra'; });
 initChips('chips-cuotas','cuotas');
 
-const recEl = document.getElementById('recurrente');
+// Débito y crédito comparten TARJETA; CUOTAS solo con crédito.
+function aplicarGruposTarjeta(){
+  const conTarjeta = sel.metodo === 'debito' || sel.metodo === 'credito';
+  $('grupo-tarjeta').hidden = !conTarjeta;
+  $('grupo-cuotas').hidden = sel.metodo !== 'credito';
+  if(!conTarjeta) $('tarjeta-otra').hidden = true;
+  else $('tarjeta-otra').hidden = sel.tarjeta !== '__otra';
+}
+
+function aplicarReglaMetodos(){
+  const permitidos = METODOS_POR_PERSONA[sel.quien];
+  const box = $('chips-metodo');
+  box.querySelectorAll('.chip').forEach(c => {
+    const ok = permitidos.includes(c.dataset.v);
+    c.classList.toggle('off', !ok);
+    if(!ok && c.classList.contains('on')){
+      c.classList.remove('on');
+      sel.metodo = 'efectivo';
+      box.querySelector('[data-v="efectivo"]').classList.add('on');
+    }
+  });
+  aplicarGruposTarjeta();
+}
+aplicarReglaMetodos();
+
+const recEl = $('recurrente');
 recEl.addEventListener('click', () => {
   sel.recurrente = !sel.recurrente;
   recEl.classList.toggle('on', sel.recurrente);
 });
 
-// Foto de factura
-const fotoInput = document.getElementById('foto-input');
-const btnFoto = document.getElementById('btn-foto');
+// ---------- foto ----------
+const fotoInput = $('foto-input');
+const btnFoto = $('btn-foto');
 btnFoto.addEventListener('click', () => fotoInput.click());
 fotoInput.addEventListener('change', () => {
   const hay = fotoInput.files && fotoInput.files.length;
@@ -275,10 +246,10 @@ fotoInput.addEventListener('change', () => {
 async function comprimirFoto(file){
   const img = await createImageBitmap(file);
   const max = 1600;
-  const esc = Math.min(1, max / Math.max(img.width, img.height));
+  const escala = Math.min(1, max / Math.max(img.width, img.height));
   const c = document.createElement('canvas');
-  c.width = Math.round(img.width * esc);
-  c.height = Math.round(img.height * esc);
+  c.width = Math.round(img.width * escala);
+  c.height = Math.round(img.height * escala);
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
   return new Promise(res => c.toBlob(res, 'image/jpeg', 0.8));
 }
@@ -292,88 +263,93 @@ async function subirFoto(file, fecha){
   return r.ok ? path : null;
 }
 
-function aplicarReglaMetodos(){
-  const permitidos = METODOS_POR_PERSONA[sel.quien];
-  const box = document.getElementById('chips-metodo');
-  box.querySelectorAll('.chip').forEach(c => {
-    const ok = permitidos.includes(c.dataset.v);
-    c.classList.toggle('off', !ok);
-    if(!ok && c.classList.contains('on')){
-      c.classList.remove('on');
-      sel.metodo = 'efectivo';
-      box.querySelector('[data-v="efectivo"]').classList.add('on');
-      document.getElementById('credito-extra').classList.remove('show');
-    }
-  });
-}
-aplicarReglaMetodos();
-
-const montoEl = document.getElementById('monto');
+// ---------- monto ----------
+const montoEl = $('monto');
 montoEl.addEventListener('input', () => {
   const n = montoEl.value.replace(/\D/g,'');
   montoEl.value = n ? Number(n).toLocaleString('es-AR') : '';
 });
 
-function hoyLocal(){
-  const d = new Date();
-  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
-}
-const fechaEl = document.getElementById('fecha');
-fechaEl.value = hoyLocal();
-
+// ---------- persistencia local + POST con anti-duplicados ----------
 function leerLS(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)) || []; }catch(e){ return []; } }
 function escribirLS(a){ localStorage.setItem(LS_KEY, JSON.stringify(a)); }
 
-async function postSupabase(g){
-  const r = await fetch(SUPABASE_URL + '/rest/v1/' + TABLA, {
-    method:'POST',
-    headers:{...H, 'Content-Type':'application/json', 'Prefer':'return=minimal'},
-    body: JSON.stringify(g),
-  });
-  return r.status === 201;
+// Si la columna local_id todavía no existe en la DB (falta correr
+// SETUP-GASTOS-SUPABASE-v5.sql), se reintenta sin dedup para no romper la carga.
+let localIdSoportado = true;
+
+async function postSupabase(gasto){
+  const intento = conLocalId => {
+    const body = {...gasto};
+    if(!conLocalId) delete body.local_id;
+    return fetch(SUPABASE_URL + '/rest/v1/' + TABLA + (conLocalId ? '?on_conflict=local_id' : ''), {
+      method:'POST',
+      headers:{...H, 'Content-Type':'application/json',
+        'Prefer': conLocalId ? 'return=minimal,resolution=ignore-duplicates' : 'return=minimal'},
+      body: JSON.stringify(body),
+    });
+  };
+  const usarLocalId = localIdSoportado && !!gasto.local_id;
+  let r = await intento(usarLocalId);
+  if(!r.ok && usarLocalId){
+    localIdSoportado = false;      // columna ausente → modo compatibilidad
+    r = await intento(false);
+  }
+  return r.ok;
 }
 
 function refrescarPendientes(){
   const n = leerLS().filter(x => x.estado === 'pendiente').length;
-  const el = document.getElementById('pendientes');
-  el.textContent = n ? ('⚠ ' + n + ' sin sincronizar — se reintenta solo') : '';
+  const el = $('pendientes');
+  el.textContent = n ? ('⚠ ' + n + ' en cola sin sincronizar — tocá para reintentar') : '';
   el.classList.toggle('show', n > 0);
 }
 
-async function reintentarPendientes(){
+let reintentando = false;
+async function reintentarPendientes(avisar){
+  if(reintentando || !navigator.onLine) { refrescarPendientes(); return; }
+  reintentando = true;
   const hist = leerLS();
-  let cambio = false;
+  let enviados = 0;
   for(const item of hist){
     if(item.estado !== 'pendiente') continue;
-    const {estado, local_id, ...gasto} = item;
-    try{ if(await postSupabase(gasto)){ item.estado = 'ok'; cambio = true; } }catch(e){}
+    const {estado, ...gasto} = item;   // el local_id VIAJA con el gasto (dedup)
+    try{ if(await postSupabase(gasto)){ item.estado = 'ok'; enviados++; } }catch(e){}
   }
-  if(cambio) escribirLS(hist);
+  if(enviados) escribirLS(hist);
+  reintentando = false;
   refrescarPendientes();
+  if(avisar && enviados) toast('✓ ' + enviados + ' gasto(s) sincronizado(s)', 'ok');
 }
 
-const btn = document.getElementById('guardar');
+$('pendientes').addEventListener('click', () => reintentarPendientes(true));
+window.addEventListener('online', () => reintentarPendientes(true));
+setInterval(() => { if(leerLS().some(x => x.estado === 'pendiente')) reintentarPendientes(false); }, 60000);
+
+// ---------- guardar ----------
+const btn = $('guardar');
 btn.addEventListener('click', async () => {
   const monto = Number(montoEl.value.replace(/\D/g,''));
   if(!monto){ montoEl.focus(); return; }
   const esCredito = sel.metodo === 'credito';
+  const conTarjeta = esCredito || sel.metodo === 'debito';
   let tarjeta = null;
-  if(esCredito){
+  if(conTarjeta){
     tarjeta = sel.tarjeta === '__otra'
-      ? (document.getElementById('tarjeta-otra').value.trim() || 'Otra')
+      ? ($('tarjeta-otra').value.trim() || 'Otra')
       : sel.tarjeta;
   }
   btn.disabled = true; btn.textContent = 'Guardando…';
 
   let foto_path = null;
   if(fotoInput.files && fotoInput.files.length){
-    try{ foto_path = await subirFoto(fotoInput.files[0], fechaEl.value || hoyLocal()); }catch(e){}
+    try{ foto_path = await subirFoto(fotoInput.files[0], fechaElegida()); }catch(e){}
   }
 
   const gasto = {
-    fecha: fechaEl.value || hoyLocal(),
+    fecha: fechaElegida(),
     monto: monto,
-    descripcion: document.getElementById('descripcion').value.trim(),
+    descripcion: $('descripcion').value.trim(),
     proyecto: sel.proyecto,
     quien: sel.quien,
     metodo: sel.metodo,
@@ -381,10 +357,11 @@ btn.addEventListener('click', async () => {
     cuotas: esCredito ? sel.cuotas : 1,
     es_recurrente: sel.recurrente,
     foto_path: foto_path,
+    local_id: uuid(),
   };
 
   const hist = leerLS();
-  const item = {...gasto, estado:'pendiente', local_id: Date.now()};
+  const item = {...gasto, estado:'pendiente'};
   hist.push(item); escribirLS(hist);
 
   let ok = false;
@@ -394,18 +371,26 @@ btn.addEventListener('click', async () => {
   const fotoFallo = fotoInput.files.length && !foto_path;
   if(navigator.vibrate) navigator.vibrate(ok ? 30 : [60,60,60]);
   btn.classList.add('ok');
-  btn.textContent = ok ? (fotoFallo ? '✓ Guardado (foto no subió)' : '✓ Guardado') : '✓ Guardado acá (sincroniza después)';
+  btn.textContent = ok ? '✓ Guardado' : '✓ Guardado acá';
+  if(!ok){
+    toast(navigator.onLine
+      ? 'No se pudo guardar en el servidor — quedó en cola y se reintenta solo'
+      : 'Sin conexión — quedó en cola, se envía al volver la señal', 'error');
+  } else if(fotoFallo){
+    toast('Gasto guardado, pero la foto no subió', 'warn');
+  }
   setTimeout(() => {
     btn.classList.remove('ok'); btn.disabled = false; btn.textContent = 'Guardar gasto';
-    montoEl.value = ''; document.getElementById('descripcion').value = '';
-    fechaEl.value = hoyLocal();
+    montoEl.value = ''; $('descripcion').value = '';
+    sel.fecha = 'hoy'; $('fecha').hidden = true; $('fecha').value = '';
+    document.querySelectorAll('#chips-fecha .chip').forEach(c => c.classList.toggle('on', c.dataset.v === 'hoy'));
     sel.recurrente = false; recEl.classList.remove('on');
     fotoInput.value = ''; btnFoto.classList.remove('on'); btnFoto.textContent = '📷 Foto de la factura';
   }, 1500);
   refrescarPendientes();
 });
 
-document.getElementById('exportar').addEventListener('click', () => {
+$('exportar').addEventListener('click', () => {
   const data = JSON.stringify(leerLS(), null, 2);
   const blob = new Blob([data], {type:'application/json'});
   const a = document.createElement('a');
@@ -414,32 +399,25 @@ document.getElementById('exportar').addEventListener('click', () => {
   a.click();
 });
 
-// ---------- Vistas (Resumen / Próximos) ----------
-const fmt$ = n => '$' + Math.round(n).toLocaleString('es-AR');
-let vista = 'form';
-
+// ---------- vistas ----------
 function setVista(v){
-  vista = (vista === v) ? 'form' : v;
-  document.body.className = vista === 'form' ? '' : 'v-' + vista;
-  document.getElementById('nav-resumen').classList.toggle('act', vista === 'resumen');
-  document.getElementById('nav-proximos').classList.toggle('act', vista === 'proximos');
-  if(vista === 'resumen') abrirVista('resumen');
-  if(vista === 'proximos') abrirVista('proximos');
+  $('vista-cargar').hidden = v !== 'cargar';
+  $('vista-proximos').hidden = v !== 'proximos';
+  $('tab-cargar').classList.toggle('act', v === 'cargar');
+  $('tab-proximos').classList.toggle('act', v === 'proximos');
+  if(v === 'proximos') abrirProximos();
 }
-document.getElementById('nav-resumen').addEventListener('click', () => setVista('resumen'));
-document.getElementById('nav-proximos').addEventListener('click', () => setVista('proximos'));
+$('tab-cargar').addEventListener('click', () => setVista('cargar'));
+$('tab-proximos').addEventListener('click', () => setVista('proximos'));
+$('refrescar-prox').addEventListener('click', () => abrirProximos());
 
-document.getElementById('clave-ok-r').addEventListener('click', () => guardarClave('clave-input-r','resumen'));
-document.getElementById('clave-ok-p').addEventListener('click', () => guardarClave('clave-input-p','proximos'));
-document.getElementById('cambiar-clave-r').addEventListener('click', () => { localStorage.removeItem(CLAVE_KEY); abrirVista('resumen'); });
-document.getElementById('cambiar-clave-p').addEventListener('click', () => { localStorage.removeItem(CLAVE_KEY); abrirVista('proximos'); });
-
-function guardarClave(inputId, v){
-  const val = document.getElementById(inputId).value.trim();
-  if(!val) return;
-  localStorage.setItem(CLAVE_KEY, val);
-  abrirVista(v);
-}
+$('clave-ok').addEventListener('click', () => {
+  const v = $('clave-input').value.trim();
+  if(!v) return;
+  localStorage.setItem(CLAVE_KEY, v);
+  abrirProximos();
+});
+$('cambiar-clave').addEventListener('click', () => { localStorage.removeItem(CLAVE_KEY); abrirProximos(); });
 
 async function traerFilas(){
   const clave = localStorage.getItem(CLAVE_KEY);
@@ -449,75 +427,37 @@ async function traerFilas(){
     headers:{...H, 'Content-Type':'application/json'},
     body: JSON.stringify({clave}),
   });
+  if(!r.ok) throw new Error('server');
   const filas = await r.json();
   return Array.isArray(filas) ? filas : [];
 }
 
-async function abrirVista(v){
-  const gate = document.getElementById(v === 'resumen' ? 'gate-resumen' : 'gate-proximos');
-  const cont = document.getElementById(v === 'resumen' ? 'resumen-cont' : 'meses');
-  const cambiar = document.getElementById(v === 'resumen' ? 'cambiar-clave-r' : 'cambiar-clave-p');
-  if(v === 'proximos') document.getElementById('prox-nota').hidden = true;
-  cambiar.hidden = true;
+async function abrirProximos(){
+  const gate = $('gate-proximos');
+  const cont = $('meses');
+  $('prox-nota').hidden = true;
+  $('cambiar-clave').hidden = true;
   if(!localStorage.getItem(CLAVE_KEY)){ gate.hidden = false; cont.innerHTML = ''; return; }
   gate.hidden = true;
-  cont.innerHTML = '<p class="prox-nota">Cargando…</p>';
+  cont.innerHTML = '<div class="vacio">Cargando…</div>';
   let filas;
   try{ filas = await traerFilas(); }
-  catch(e){ cont.innerHTML = '<p class="prox-nota">Sin conexión — probá de nuevo.</p>'; return; }
-  if(!filas.length){
-    cont.innerHTML = '<p class="prox-nota">Sin datos (¿la clave está bien?).</p>';
-    cambiar.hidden = false;
+  catch(e){
+    cont.innerHTML = '<div class="vacio"><b>' + (e.message === 'server' ? 'Error del servidor' : 'Sin conexión') + '</b>Probá de nuevo en un rato.</div>';
     return;
   }
-  if(v === 'resumen') renderResumen(filas); else { renderMeses(proyectar(filas)); document.getElementById('prox-nota').hidden = false; }
-  cambiar.hidden = false;
-}
-
-// ----- Resumen -----
-function renderResumen(filas){
-  const cont = document.getElementById('resumen-cont');
-  const total = filas.reduce((s, f) => s + Number(f.monto), 0);
-  const porQuien = {}, porProy = {};
-  for(const f of filas){
-    porQuien[f.quien] = (porQuien[f.quien] || 0) + Number(f.monto);
-    porProy[f.proyecto] = (porProy[f.proyecto] || 0) + Number(f.monto);
+  if(!filas.length){
+    cont.innerHTML = '<div class="vacio"><b>Sin datos</b>¿La clave está bien?</div>';
+    $('cambiar-clave').hidden = false;
+    return;
   }
-  let html = '<div class="res-card"><h3>Inversión global</h3><div class="total">' + fmt$(total) + '</div>' +
-    Object.entries(porProy).map(([p, v]) => '<div class="res-item"><span>' + (PROYECTOS[p] || p) + '</span><span>' + fmt$(v) + '</span></div>').join('') +
-    '</div>';
-  html += '<div class="res-card"><h3>Cuánto puso cada uno</h3>' +
-    ['jose','facu','agus'].filter(q => porQuien[q]).map(q =>
-      '<div class="res-item"><span>' + NOMBRES[q] + '</span><span>' + fmt$(porQuien[q]) + '</span></div>').join('') +
-    '</div>';
-  const orden = [...filas].sort((a, b) => b.fecha.localeCompare(a.fecha) || b.id - a.id);
-  html += '<div class="res-card"><h3>Qué se compró</h3>' +
-    orden.map(f => {
-      const [y, m, d] = f.fecha.split('-');
-      const extra = (f.cuotas > 1 ? ' · ' + f.cuotas + ' cuotas' : '') + (f.es_recurrente ? ' · 🔁' : '');
-      const foto = f.foto_path ? ' <span class="lnk" data-foto="' + f.foto_path + '">📎</span>' : '';
-      return '<div class="res-item"><span>' + Number(d) + '/' + Number(m) + ' · ' + (f.descripcion || '(sin detalle)') +
-        ' · ' + (NOMBRES[f.quien] || f.quien) + extra + foto + '</span><span>' + fmt$(Number(f.monto)) + '</span></div>';
-    }).join('') +
-    '</div>';
-  cont.innerHTML = html;
-  cont.querySelectorAll('[data-foto]').forEach(el => el.addEventListener('click', () => verFoto(el.dataset.foto)));
+  renderMeses(proyectar(filas));
+  $('prox-nota').hidden = false;
+  $('cambiar-clave').hidden = false;
 }
 
-async function verFoto(path){
-  try{
-    const r = await fetch(SUPABASE_URL + '/storage/v1/object/facturas/' + path, {headers: H});
-    if(!r.ok) return;
-    const url = URL.createObjectURL(await r.blob());
-    document.getElementById('foto-grande').src = url;
-    document.getElementById('foto-overlay').classList.add('show');
-  }catch(e){}
-}
-document.getElementById('foto-overlay').addEventListener('click', () => {
-  document.getElementById('foto-overlay').classList.remove('show');
-});
-
-// ----- Próximos -----
+// Regla: TODA compra a crédito impacta los meses siguientes (aun en 1 cuota).
+// Recurrentes se repiten cada mes; si algo es crédito Y recurrente, manda el crédito (sin doble conteo).
 function proyectar(filas){
   const hoy = new Date();
   const meses = [];
@@ -530,19 +470,19 @@ function proyectar(filas){
     const [fy, fm] = f.fecha.split('-').map(Number);
     const base = idx(fy, fm - 1);
     const etiqueta = f.descripcion || '(sin detalle)';
-    const quien = NOMBRES[f.quien] || f.quien;
-    const proy = PROYECTOS[f.proyecto] || f.proyecto;
-    if(f.es_recurrente){
-      for(let k = 0; k < meses.length; k++){
-        if(k > base) meses[k].items.push({t:'🔁 ' + etiqueta + ' · ' + quien + ' · ' + proy, v: Number(f.monto)});
-      }
+    const sub = (NOMBRES[f.quien] || f.quien) + ' · ' + (PROYECTOS[f.proyecto] || f.proyecto);
+    const esCredito = f.metodo === 'credito';
+    if(f.es_recurrente && !esCredito){
+      for(let k = Math.max(0, base + 1); k < meses.length; k++)
+        meses[k].items.push({t: etiqueta, sub, rec:true, v: Number(f.monto)});
     }
-    if(f.cuotas > 1){
-      const cuota = Number(f.monto) / f.cuotas;
-      for(let n = 1; n <= f.cuotas; n++){
-        const k = base + n;
+    if(esCredito){
+      const n = Math.max(1, Number(f.cuotas) || 1);
+      const cuota = Number(f.monto) / n;
+      for(let i = 1; i <= n; i++){
+        const k = base + i;
         if(k >= 0 && k < meses.length)
-          meses[k].items.push({t: etiqueta + ' (cuota ' + n + '/' + f.cuotas + ') · ' + quien + ' · ' + proy, v: cuota});
+          meses[k].items.push({t: etiqueta, sub, cuota: i + '/' + n, v: cuota});
       }
     }
   }
@@ -550,7 +490,7 @@ function proyectar(filas){
 }
 
 function renderMeses(meses){
-  const cont = document.getElementById('meses');
+  const cont = $('meses');
   cont.innerHTML = '';
   let algo = false;
   for(const mes of meses){
@@ -560,14 +500,22 @@ function renderMeses(meses){
     const nombre = new Date(mes.y, mes.m, 1).toLocaleDateString('es-AR', {month:'long', year:'numeric'});
     const card = document.createElement('div');
     card.className = 'mes-card';
-    card.innerHTML = '<h3>' + nombre + '</h3><div class="total">' + fmt$(total) + '</div>' +
-      mes.items.map(i => '<div class="mes-item"><span>' + i.t + '</span><span>' + fmt$(i.v) + '</span></div>').join('');
+    card.innerHTML =
+      '<div class="mes-head"><span class="mes-nombre">' + esc(nombre) + '</span><span class="mes-total money">' + fmt$(total) + '</span></div>' +
+      mes.items.map(i =>
+        '<div class="mes-item"><span class="dos-lineas">' +
+          '<span class="mes-t">' + (i.rec ? '🔁 ' : '') + esc(i.t) + '</span>' +
+          '<span class="mes-sub">' + esc(i.sub) + '</span></span>' +
+        (i.cuota ? '<span class="cuota-n">' + i.cuota + '</span>' : '') +
+        '<b class="money">' + fmt$(i.v) + '</b></div>').join('');
     cont.appendChild(card);
   }
-  if(!algo) cont.innerHTML = '<p class="prox-nota">Nada proyectado: sin cuotas pendientes ni gastos recurrentes.</p>';
+  if(!algo) cont.innerHTML = '<div class="vacio"><b>Nada proyectado</b>Sin cuotas pendientes ni gastos recurrentes.</div>';
 }
 
-reintentarPendientes();
+// ---------- arranque ----------
+if(location.hash === '#proximos') setVista('proximos');
+reintentarPendientes(false);
 if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
 </script>
 </body>

@@ -1,7 +1,8 @@
-// Service worker de la app personal: cachea el shell para abrir offline.
-// Scope: /gastos-apex/personal/ (no toca la app de obras).
-const CACHE = 'gastos-jose-v2';
-const SHELL = ['.', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
+// Service worker de la app personal — NETWORK-FIRST para HTML/CSS:
+// José ve siempre la última versión apenas hay señal; el cache queda
+// como respaldo offline. Scope: /gastos-apex/personal/ (no toca obras).
+const CACHE = 'gastos-jose-v3';
+const SHELL = ['.', 'index.html', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
@@ -17,11 +18,26 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET' || !e.request.url.startsWith(self.location.origin)) return;
-  e.respondWith(
-    caches.match(e.request).then(hit => hit || fetch(e.request).then(r => {
-      const copia = r.clone();
-      caches.open(CACHE).then(c => c.put(e.request, copia));
-      return r;
-    }))
-  );
+  const req = e.request;
+  const esVivo = req.mode === 'navigate' || req.destination === 'document' ||
+                 req.destination === 'style' || /\.(html|css)$/.test(new URL(req.url).pathname);
+  if (esVivo) {
+    // cache:'no-cache' revalida SIEMPRE contra el server (evita que el
+    // HTTP cache del navegador devuelva un HTML viejo "fresco").
+    e.respondWith(
+      fetch(req, {cache:'no-cache'}).then(r => {
+        const copia = r.clone();
+        caches.open(CACHE).then(c => c.put(req, copia));
+        return r;
+      }).catch(() => caches.match(req))
+    );
+  } else {
+    e.respondWith(
+      caches.match(req).then(hit => hit || fetch(req).then(r => {
+        const copia = r.clone();
+        caches.open(CACHE).then(c => c.put(req, copia));
+        return r;
+      }))
+    );
+  }
 });
