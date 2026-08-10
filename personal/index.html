@@ -3,173 +3,23 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<title>Gastos José · Apex Sync</title>
-<meta name="theme-color" content="#0c100d">
+<title>Finanzas José · Apex Sync</title>
+<meta name="theme-color" content="#0F272E">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Gastos José">
-<style>
-  :root{
-    --bg:#0c100d; --panel:#151c17; --panel2:#1b241d; --line:#232e26; --line2:#33413a;
-    --txt:#f2f5f3; --dim:#8b9c90; --faint:#5d6f63;
-    --accent:#2fbf71; --accent2:#249a59; --accent-soft:rgba(47,191,113,.14);
-    --ok:#2ecc71; --warn:#f0a92e; --error:#ff5c5c;
-    --font-num: ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
-  }
-  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
-  html,body{margin:0; padding:0; background:var(--bg); color:var(--txt);
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; font-size:16px}
-  body{min-height:100dvh;
-    padding:env(safe-area-inset-top) 16px calc(env(safe-area-inset-bottom) + 84px)}
-  .money{font-family:var(--font-num); font-variant-numeric:tabular-nums; letter-spacing:-0.02em}
-  /* Desktop/tablet: la app no se estira de borde a borde */
-  header, main{width:100%; max-width:560px; margin-left:auto; margin-right:auto}
-  main[hidden]{display:none}
-
-  header{display:flex; align-items:center; gap:10px; padding:14px 2px 6px}
-  .logo{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--accent),var(--accent2));
-    display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;letter-spacing:.5px;color:#fff;flex:none}
-  header h1{flex:1;min-width:0;font-size:15px;font-weight:600;margin:0;color:var(--dim);
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  header h1 b{color:var(--txt);font-weight:700}
-  .periodo{flex:none;font-size:12px;font-weight:700;color:var(--dim);
-    background:var(--panel);border:1px solid var(--line);padding:6px 10px;border-radius:999px}
-
-  /* ---- form ---- */
-  .monto-wrap{padding:14px 0 4px;text-align:center}
-  .monto-box{display:flex;align-items:baseline;justify-content:center;gap:6px}
-  .monto-box .signo{font-size:30px;color:var(--faint);font-weight:600}
-  #monto{font-size:clamp(52px,16vw,72px);font-weight:800;background:none;border:none;color:var(--txt);
-    width:100%;max-width:280px;text-align:center;outline:none;padding:0;caret-color:var(--accent);
-    font-family:var(--font-num);font-variant-numeric:tabular-nums;letter-spacing:-0.03em}
-  #monto::placeholder{color:#39443c}
-
-  .field{width:100%;min-height:56px;background:var(--panel);border:1.5px solid var(--line);border-radius:12px;
-    color:var(--txt);font-size:16px;padding:13px 14px;outline:none;color-scheme:dark}
-  .field:focus{border-color:var(--accent)}
-  .field::placeholder{color:var(--dim)}
-
-  .grupo{margin:14px 0 0}
-  .grupo label{display:block;font-size:11px;font-weight:700;letter-spacing:1.2px;color:var(--dim);margin:0 0 8px 2px;text-transform:uppercase}
-  .chips{display:flex;gap:8px;flex-wrap:wrap}
-  .chip{flex:1 1 auto;min-width:80px;min-height:56px;display:inline-flex;align-items:center;justify-content:center;
-    padding:10px;border-radius:12px;border:1.5px solid var(--line);
-    background:var(--panel);color:var(--txt);font-size:15px;font-weight:700;text-align:center;cursor:pointer;
-    transition:background .12s,border-color .12s,transform .12s}
-  .chip:active{transform:scale(.97)}
-  .chip.on{background:var(--accent);border-color:var(--accent);color:#04170c}
-  .chips--compact .chip{min-width:52px;flex:1 1 0}
-  .chip--toggle{width:100%}
-  .chip--toggle.on{background:var(--warn);border-color:var(--warn);color:#1a1305}
-
-  #guardar{margin-top:20px;width:100%;min-height:64px;padding:17px;border:none;border-radius:14px;
-    background:linear-gradient(135deg,var(--accent),var(--accent2));color:#04170c;
-    font-size:17px;font-weight:800;letter-spacing:.3px;cursor:pointer;transition:transform .08s,opacity .2s}
-  #guardar:active{transform:scale(.985)}
-  #guardar:disabled{opacity:.6}
-  #guardar.ok{background:var(--ok)}
-
-  footer{padding-top:18px;text-align:center;font-size:12.5px;color:var(--faint)}
-  .pendientes{display:none;margin:12px auto 0;align-items:center;justify-content:center;gap:6px;
-    min-height:44px;padding:8px 16px;border-radius:999px;width:fit-content;max-width:100%;
-    background:rgba(240,169,46,.12);border:1.5px solid var(--warn);
-    color:var(--warn);font-size:13px;font-weight:700;cursor:pointer}
-  .pendientes.show{display:flex}
-  #exportar{margin-top:8px;font-size:12px;color:var(--faint);text-decoration:underline;background:none;border:none;cursor:pointer;min-height:40px}
-
-  /* ---- gate de clave ---- */
-  .gate{margin:32px auto 24px;text-align:center;max-width:320px}
-  .gate p{color:var(--dim);font-size:13px;margin:0 0 12px}
-  .gate .field{text-align:center}
-  .gate .btn-clave{margin-top:12px;width:100%;min-height:56px;padding:12px 26px;border:none;border-radius:12px;
-    background:var(--accent);color:#04170c;font-size:15px;font-weight:800;cursor:pointer}
-  .cambiar-clave{background:none;border:none;color:var(--faint);font-size:12px;
-    text-decoration:underline;cursor:pointer;display:block;margin:12px auto 0;min-height:44px}
-  .cambiar-clave[hidden]{display:none}
-
-  /* ---- secciones / cards ---- */
-  .seccion{display:flex;align-items:baseline;justify-content:space-between;margin:24px 2px 8px}
-  .seccion h2{margin:0;font-size:12px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:var(--dim)}
-  .seccion .accion{background:none;border:none;padding:0;cursor:pointer;font-size:13px;font-weight:700;color:var(--accent)}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;margin:12px 0}
-  .card > h3{margin:0 0 8px;font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--dim)}
-  .vacio{text-align:center;padding:32px 16px;color:var(--faint);font-size:13px}
-  .vacio b{display:block;color:var(--dim);font-size:16px;margin-bottom:4px}
-
-  /* ---- hero resumen ---- */
-  .hero{text-align:center;padding:20px 0 8px}
-  .hero .etiqueta{font-size:12px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:var(--dim)}
-  .hero .total{font-size:clamp(38px,11vw,52px);font-weight:800;letter-spacing:-0.03em;margin:4px 0 6px;line-height:1}
-  .hero .sub{font-size:13px;color:var(--faint);font-weight:600}
-  .bars{display:flex;flex-direction:column;gap:12px}
-  .bar-row{display:grid;grid-template-columns:82px 1fr auto;align-items:center;gap:12px;font-size:13px;font-weight:700}
-  .bar-row .lbl{color:var(--dim)}
-  .bar-track{height:18px;background:var(--panel2);border-radius:999px;overflow:hidden}
-  .bar-fill{height:100%;width:var(--w,0%);border-radius:999px;background:var(--accent);min-width:4px}
-  .bar-row .cuanto{color:var(--txt);white-space:nowrap}
-  .tj-row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;
-    border-top:1px solid var(--line);font-size:13.5px;color:var(--dim);font-weight:600}
-  .tj-row:first-of-type{border-top:none;padding-top:2px}
-  .tj-row b{color:var(--txt);font-weight:700;white-space:nowrap}
-
-  /* ---- lista de últimas compras ---- */
-  .gasto{display:grid;grid-template-columns:1fr auto;align-items:center;gap:12px;
-    padding:12px 14px;background:var(--panel);border:1px solid var(--line);border-radius:14px;margin:8px 0}
-  .gasto .desc{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .gasto .meta{display:flex;align-items:center;gap:6px;margin-top:3px;flex-wrap:wrap}
-  .badge{display:inline-flex;align-items:center;font-size:11.5px;font-weight:700;padding:2px 8px;
-    border-radius:999px;background:var(--panel2);color:var(--dim);white-space:nowrap}
-  .badge--credito{background:rgba(240,169,46,.14);color:var(--warn)}
-  .badge--recurrente{background:var(--accent-soft);color:var(--accent)}
-  .gasto .importe{text-align:right}
-  .gasto .importe .m{font-size:16px;font-weight:800;white-space:nowrap}
-  .gasto .importe .f{font-size:12px;color:var(--faint);margin-top:2px}
-
-  /* ---- mes-cards (próximos) ---- */
-  .mes-card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;margin:12px 0}
-  .mes-head{display:flex;justify-content:space-between;align-items:baseline}
-  .mes-nombre{font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--dim)}
-  .mes-total{font-size:22px;font-weight:800}
-  .mes-item{display:flex;justify-content:space-between;align-items:center;gap:8px;
-    padding:7px 0;border-top:1px solid var(--line);margin-top:7px;font-size:13px;color:var(--dim)}
-  .mes-item:first-of-type{margin-top:8px}
-  .mes-item .dos-lineas{flex:1;min-width:0}
-  .mes-t{display:block;color:var(--txt);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .mes-sub{display:block;margin-top:1px;font-size:11px;font-weight:600;color:var(--faint);
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .cuota-n{font-size:11px;font-weight:800;color:var(--warn);background:rgba(240,169,46,.12);
-    padding:1px 7px;border-radius:999px;flex:none}
-  .mes-item b{color:var(--txt);font-weight:700;white-space:nowrap}
-  .prox-nota{font-size:12px;color:var(--faint);text-align:center;margin:10px 0}
-
-  /* ---- tabbar ---- */
-  .tabbar{position:fixed;left:0;right:0;bottom:0;z-index:40;display:flex;
-    background:rgba(21,28,23,.92);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
-    border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
-  .tab{flex:1;min-height:64px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
-    background:none;border:none;cursor:pointer;font-size:12px;font-weight:700;color:var(--faint);font-family:inherit}
-  .tab .ico{font-size:22px;line-height:1}
-  .tab.act{color:var(--accent)}
-  .tab.act::after{content:"";width:4px;height:4px;border-radius:50%;background:var(--accent);margin-top:1px}
-
-  /* ---- toast ---- */
-  .toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 88px);
-    transform:translateX(-50%) translateY(16px);max-width:calc(100vw - 32px);z-index:60;
-    background:var(--panel2);border:1.5px solid var(--line2);color:var(--txt);
-    padding:13px 18px;border-radius:14px;font-size:13px;font-weight:700;text-align:center;
-    opacity:0;pointer-events:none;transition:opacity .2s,transform .2s}
-  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-  .toast--ok{border-color:var(--ok);color:var(--ok)}
-  .toast--error{border-color:var(--error);color:var(--error)}
-  .toast--warn{border-color:var(--warn);color:var(--warn)}
-</style>
+<meta name="apple-mobile-web-app-title" content="Finanzas José">
+<link rel="stylesheet" href="apex-sync.css">
 </head>
 <body>
-<header>
-  <div class="logo">AS</div>
-  <h1><b>Mis gastos</b> · Apex Sync</h1>
+
+<header class="topbar">
+  <svg class="logo" viewBox="0 0 32 32" aria-hidden="true">
+    <path d="M16 4.5 L27.5 26 H4.5 Z" fill="none" stroke="#E8E2D5" stroke-width="1.6" stroke-linejoin="round"/>
+    <path d="M3 20.5 Q9.5 15.5 16 20.5 T29 20.5" fill="none" stroke="#C98F5F" stroke-width="2.2" stroke-linecap="round"/>
+  </svg>
+  <h1><b>Finanzas José</b> · Apex Sync</h1>
   <span class="periodo" id="periodo"></span>
 </header>
 
@@ -178,12 +28,20 @@
   <div class="monto-wrap">
     <div class="monto-box">
       <span class="signo">$</span>
-      <input id="monto" type="text" inputmode="numeric" autocomplete="off" placeholder="0" aria-label="Monto">
+      <input id="monto" class="monto money" type="text" inputmode="numeric" autocomplete="off" placeholder="0" aria-label="Monto">
     </div>
   </div>
 
   <div class="grupo">
     <input id="descripcion" class="field" type="text" autocomplete="off" placeholder="¿En qué? (ej: nafta, super, gym)">
+  </div>
+
+  <div class="grupo">
+    <label>Tipo</label>
+    <div class="chips" id="chips-categoria">
+      <button class="chip chip--personal on" data-v="personal">Personal</button>
+      <button class="chip chip--negocio" data-v="negocio">Negocio</button>
+    </div>
   </div>
 
   <div class="grupo">
@@ -231,45 +89,68 @@
     <button id="recurrente" class="chip chip--toggle">🔁 Se repite todos los meses</button>
   </div>
 
-  <button id="guardar">Guardar gasto</button>
+  <button id="guardar" class="btn-primary">Guardar gasto</button>
 
   <div style="text-align:center"><button class="pendientes" id="pendientes"></button></div>
 
-  <footer>
+  <footer class="pie">
     Se guarda al instante · Jarvis lo lee y actualiza tus finanzas
-    <br><button id="exportar">Exportar respaldo</button>
+    <br><button class="lnk" id="exportar">Exportar respaldo</button>
   </footer>
 </main>
 
 <!-- ============ GATE DE CLAVE (compartido) ============ -->
 <main id="vista-gate" hidden>
   <div class="gate">
-    <p>Tu clave para ver tus números:</p>
+    <p>Tu clave para ver tus números (una sola vez):</p>
     <input id="clave-input" class="field" type="text" autocomplete="off" placeholder="clave">
-    <button id="clave-ok" class="btn-clave">Entrar</button>
+    <button id="clave-ok" class="btn-primary">Entrar</button>
   </div>
+</main>
+
+<!-- ============ HISTORIAL ============ -->
+<main id="vista-historial" hidden>
+  <div class="seccion"><h2>Historial</h2><button class="accion" id="refrescar-hist">↻ Actualizar</button></div>
+  <input id="buscador" class="field field--busca" type="search" autocomplete="off" placeholder="Buscar gasto, tarjeta, monto…">
+  <div class="filtros" id="filtro-categoria">
+    <button class="chip on" data-v="todos">Todo</button>
+    <button class="chip chip--personal" data-v="personal">Personal</button>
+    <button class="chip chip--negocio" data-v="negocio">Negocio</button>
+  </div>
+  <div class="filtros" id="filtro-metodo">
+    <button class="chip on" data-v="todos">Todos</button>
+    <button class="chip" data-v="efectivo">Efectivo</button>
+    <button class="chip" data-v="transferencia">Transf.</button>
+    <button class="chip" data-v="debito">Débito</button>
+    <button class="chip" data-v="credito">Crédito</button>
+  </div>
+  <p class="hist-stats" id="hist-stats"></p>
+  <div id="hist-lista"></div>
+  <button class="cambiar-clave" id="cambiar-clave-h" hidden>cambiar clave</button>
 </main>
 
 <!-- ============ RESUMEN ============ -->
 <main id="vista-resumen" hidden>
-  <div class="seccion"><h2>Resumen</h2><button class="accion" id="refrescar-resumen">↻ Actualizar</button></div>
-  <div id="resumen-contenido"></div>
+  <div class="seccion"><h2>Resumen</h2><button class="accion" id="refrescar-res">↻ Actualizar</button></div>
+  <div id="res-contenido"></div>
+  <p class="pie" id="actualizado"></p>
   <button class="cambiar-clave" id="cambiar-clave-r" hidden>cambiar clave</button>
-</main>
-
-<!-- ============ PRÓXIMOS ============ -->
-<main id="vista-proximos" hidden>
-  <div class="seccion"><h2>Compromisos que vienen</h2><button class="accion" id="refrescar-prox">↻ Actualizar</button></div>
-  <div id="meses"></div>
-  <p class="prox-nota" id="prox-nota" hidden>Suma cuotas de crédito + gastos que se repiten. Las cuotas empiezan el mes siguiente a la compra.</p>
-  <button class="cambiar-clave" id="cambiar-clave-p" hidden>cambiar clave</button>
 </main>
 
 <!-- ============ TABBAR ============ -->
 <nav class="tabbar">
-  <button class="tab act" id="tab-cargar"><span class="ico">＋</span>Cargar</button>
-  <button class="tab" id="tab-resumen"><span class="ico">▤</span>Resumen</button>
-  <button class="tab" id="tab-proximos"><span class="ico">▦</span>Próximos</button>
+  <button class="tab act" id="tab-cargar" aria-label="Cargar">
+    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4v14M4 11h14"/></svg>
+    Cargar
+  </button>
+  <button class="tab" id="tab-historial" aria-label="Historial">
+    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 5.5h14M4 11h14M4 16.5h9"/></svg>
+    Historial
+  </button>
+  <button class="tab" id="tab-resumen" aria-label="Resumen">
+    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4.5 18V9.5M11 18V4.5M17.5 18v-6"/></svg>
+    Resumen
+  </button>
 </nav>
 
 <div class="toast" id="toast" role="status"></div>
@@ -284,12 +165,17 @@ const CLAVE_KEY = 'gastos_jose_clave';
 const H = {'apikey': ANON_KEY, 'Authorization': 'Bearer ' + ANON_KEY};
 
 const METODO_TXT = {efectivo:'Efectivo', transferencia:'Transferencia', debito:'Débito', credito:'Crédito'};
-const sel = { fecha:'hoy', metodo:'efectivo', tarjeta:'Visa Francés BBVA', cuotas:1, recurrente:false };
+const CAT_TXT = {personal:'Personal', negocio:'Negocio'};
+
+const sel = { fecha:'hoy', categoria:'personal', metodo:'efectivo', tarjeta:'Visa Francés BBVA', cuotas:1, recurrente:false };
+const filtro = { q:'', categoria:'todos', metodo:'todos' };
 
 // ---------- helpers ----------
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt$ = n => '$ ' + Math.round(n).toLocaleString('es-AR');
+const fmtK = n => n >= 1e6 ? (n/1e6).toLocaleString('es-AR', {maximumFractionDigits:1}) + ' M'
+              : n >= 1e3 ? Math.round(n/1e3) + ' k' : String(Math.round(n));
 const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(36).slice(2));
 
 let toastTimer = null;
@@ -310,15 +196,24 @@ function fechaElegida(){
   if(sel.fecha === 'ayer'){ const d = new Date(); d.setDate(d.getDate()-1); return isoLocal(d); }
   return hoyLocal();
 }
+function etiquetaDia(fechaISO){
+  const d = new Date(); d.setDate(d.getDate()-1);
+  const ayer = isoLocal(d);
+  const [y, m, dd] = fechaISO.split('-').map(Number);
+  const txt = new Date(y, m-1, dd).toLocaleDateString('es-AR', {weekday:'short', day:'numeric', month:'short'}).replace(/\./g,'');
+  if(fechaISO === hoyLocal()) return 'Hoy · ' + txt;
+  if(fechaISO === ayer) return 'Ayer · ' + txt;
+  return txt;
+}
 
 const mesNombre = new Date().toLocaleDateString('es-AR', {month:'long'});
 $('periodo').textContent = mesNombre.charAt(0).toUpperCase() + mesNombre.slice(1);
 
-// ---------- chips ----------
+// ---------- chips del form ----------
 function initChips(id, campo, cb){
   const box = $(id);
   box.addEventListener('click', e => {
-    const b = e.target.closest('.chip'); if(!b) return;
+    const b = e.target.closest('.chip'); if(!b || b.classList.contains('off')) return;
     box.querySelectorAll('.chip').forEach(c => c.classList.remove('on'));
     b.classList.add('on');
     sel[campo] = campo === 'cuotas' ? parseInt(b.dataset.v, 10) : b.dataset.v;
@@ -326,6 +221,7 @@ function initChips(id, campo, cb){
   });
 }
 
+initChips('chips-categoria','categoria');
 initChips('chips-fecha','fecha', v => {
   const f = $('fecha');
   f.hidden = v !== 'otra';
@@ -335,7 +231,6 @@ initChips('chips-metodo','metodo', aplicarGruposTarjeta);
 initChips('chips-tarjeta','tarjeta', v => { $('tarjeta-otra').hidden = v !== '__otra'; });
 initChips('chips-cuotas','cuotas');
 
-// Débito y crédito llevan TARJETA; CUOTAS solo con crédito.
 function aplicarGruposTarjeta(){
   const conTarjeta = sel.metodo === 'debito' || sel.metodo === 'credito';
   $('grupo-tarjeta').hidden = !conTarjeta;
@@ -358,32 +253,44 @@ montoEl.addEventListener('input', () => {
   montoEl.value = n ? Number(n).toLocaleString('es-AR') : '';
 });
 
-// ---------- persistencia local + POST con anti-duplicados ----------
+// ---------- persistencia local + POST resiliente ----------
 function leerLS(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)) || []; }catch(e){ return []; } }
 function escribirLS(a){ localStorage.setItem(LS_KEY, JSON.stringify(a)); }
 
-// Si la columna local_id todavía no existe en la DB (falta correr
-// SETUP-GASTOS-SUPABASE-v5.sql), se reintenta sin dedup para no romper la carga.
+// Resiliencia de esquema: si la DB todavía no tiene la columna `categoria`
+// (falta correr SETUP-GASTOS-V5.sql) o `local_id`, se reintenta sin esa
+// columna y la app sigue andando igual.
+// Anti-duplicados: el local_id es UNIQUE en la DB; un reintento de un gasto
+// que ya llegó contesta 409 (duplicado) y se toma como "ya guardado".
+// No se usa on_conflict/ignore-duplicates: el RLS insert-only no lo permite.
 let localIdSoportado = true;
+let categoriaSoportada = true;
 
 async function postSupabase(gasto){
-  const intento = conLocalId => {
+  const intento = (conLocalId, conCategoria) => {
     const body = {...gasto};
     if(!conLocalId) delete body.local_id;
-    return fetch(SUPABASE_URL + '/rest/v1/' + TABLA + (conLocalId ? '?on_conflict=local_id' : ''), {
+    if(!conCategoria) delete body.categoria;
+    return fetch(SUPABASE_URL + '/rest/v1/' + TABLA, {
       method:'POST',
-      headers:{...H, 'Content-Type':'application/json',
-        'Prefer': conLocalId ? 'return=minimal,resolution=ignore-duplicates' : 'return=minimal'},
+      headers:{...H, 'Content-Type':'application/json', 'Prefer':'return=minimal'},
       body: JSON.stringify(body),
     });
   };
-  const usarLocalId = localIdSoportado && !!gasto.local_id;
-  let r = await intento(usarLocalId);
-  if(!r.ok && usarLocalId){
-    localIdSoportado = false;      // columna ausente → modo compatibilidad
-    r = await intento(false);
+  for(let i = 0; i < 3; i++){
+    const usaLocal = localIdSoportado && !!gasto.local_id;
+    const usaCat = categoriaSoportada && gasto.categoria != null;
+    const r = await intento(usaLocal, usaCat);
+    if(r.ok) return true;
+    let msg = '';
+    try{ msg = await r.text(); }catch(e){}
+    if(r.status === 409 && /23505|duplicate/i.test(msg)) return true;   // ya estaba
+    if(usaCat && /categoria/i.test(msg)){ categoriaSoportada = false; continue; }
+    if(usaLocal && /local_id/i.test(msg)){ localIdSoportado = false; continue; }
+    if(usaCat || usaLocal){ categoriaSoportada = false; localIdSoportado = false; continue; }
+    return false;
   }
-  return r.ok;
+  return false;
 }
 
 function refrescarPendientes(){
@@ -402,10 +309,10 @@ async function reintentarPendientes(avisar){
   for(const item of hist){
     if(item.estado !== 'pendiente') continue;
     const {estado, ...gasto} = item;   // el local_id VIAJA con el gasto (dedup)
-    if(gasto.local_id != null) gasto.local_id = String(gasto.local_id); // ítems viejos: era número
+    if(gasto.local_id != null) gasto.local_id = String(gasto.local_id);
     try{ if(await postSupabase(gasto)){ item.estado = 'ok'; enviados++; } }catch(e){}
   }
-  if(enviados) escribirLS(hist);
+  if(enviados){ escribirLS(hist); filasCache = null; }
   reintentando = false;
   refrescarPendientes();
   if(avisar && enviados) toast('✓ ' + enviados + ' gasto(s) sincronizado(s)', 'ok');
@@ -434,6 +341,7 @@ btn.addEventListener('click', async () => {
     fecha: fechaElegida(),
     monto: monto,
     descripcion: $('descripcion').value.trim(),
+    categoria: sel.categoria,
     metodo: sel.metodo,
     tarjeta: tarjeta,
     cuotas: esCredito ? sel.cuotas : 1,
@@ -448,6 +356,7 @@ btn.addEventListener('click', async () => {
   let ok = false;
   try{ ok = await postSupabase(gasto); }catch(e){}
   if(ok){ item.estado = 'ok'; escribirLS(hist); }
+  filasCache = null;
 
   if(navigator.vibrate) navigator.vibrate(ok ? 30 : [60,60,60]);
   btn.classList.add('ok');
@@ -456,12 +365,16 @@ btn.addEventListener('click', async () => {
     toast(navigator.onLine
       ? 'No se pudo guardar en el servidor — quedó en cola y se reintenta solo'
       : 'Sin conexión — quedó en cola, se envía al volver la señal', 'error');
+  } else {
+    toast('✓ Guardado — ya figura arriba del Historial', 'ok');
   }
   setTimeout(() => {
     btn.classList.remove('ok'); btn.disabled = false; btn.textContent = 'Guardar gasto';
     montoEl.value = ''; $('descripcion').value = '';
     sel.fecha = 'hoy'; $('fecha').hidden = true; $('fecha').value = '';
     document.querySelectorAll('#chips-fecha .chip').forEach(c => c.classList.toggle('on', c.dataset.v === 'hoy'));
+    sel.categoria = 'personal';
+    document.querySelectorAll('#chips-categoria .chip').forEach(c => c.classList.toggle('on', c.dataset.v === 'personal'));
     sel.recurrente = false; recEl.classList.remove('on');
   }, 1500);
   refrescarPendientes();
@@ -476,38 +389,10 @@ $('exportar').addEventListener('click', () => {
   a.click();
 });
 
-// ---------- vistas ----------
-let destinoConClave = 'resumen';   // a dónde volver después del gate
-function setVista(v){
-  ['cargar','gate','resumen','proximos'].forEach(x => { $('vista-' + x).hidden = x !== v; });
-  $('tab-cargar').classList.toggle('act', v === 'cargar');
-  $('tab-resumen').classList.toggle('act', v === 'resumen' || (v === 'gate' && destinoConClave === 'resumen'));
-  $('tab-proximos').classList.toggle('act', v === 'proximos' || (v === 'gate' && destinoConClave === 'proximos'));
-  if(v === 'resumen') abrirResumen();
-  if(v === 'proximos') abrirProximos();
-}
-function pedirVista(v){
-  if((v === 'resumen' || v === 'proximos') && !localStorage.getItem(CLAVE_KEY)){
-    destinoConClave = v; setVista('gate'); return;
-  }
-  setVista(v);
-}
-$('tab-cargar').addEventListener('click', () => setVista('cargar'));
-$('tab-resumen').addEventListener('click', () => pedirVista('resumen'));
-$('tab-proximos').addEventListener('click', () => pedirVista('proximos'));
-$('refrescar-resumen').addEventListener('click', () => abrirResumen());
-$('refrescar-prox').addEventListener('click', () => abrirProximos());
-
-$('clave-ok').addEventListener('click', () => {
-  const v = $('clave-input').value.trim();
-  if(!v) return;
-  localStorage.setItem(CLAVE_KEY, v);
-  setVista(destinoConClave);
-});
-$('cambiar-clave-r').addEventListener('click', () => { localStorage.removeItem(CLAVE_KEY); pedirVista('resumen'); });
-$('cambiar-clave-p').addEventListener('click', () => { localStorage.removeItem(CLAVE_KEY); pedirVista('proximos'); });
-
-async function traerFilas(){
+// ---------- datos ----------
+let filasCache = null;
+async function traerFilas(force){
+  if(filasCache && !force) return filasCache;
   const clave = localStorage.getItem(CLAVE_KEY);
   const r = await fetch(SUPABASE_URL + '/rest/v1/rpc/' + RPC_LISTA, {
     method:'POST',
@@ -516,117 +401,178 @@ async function traerFilas(){
   });
   if(!r.ok) throw new Error('server');
   const filas = await r.json();
-  return Array.isArray(filas) ? filas : [];
+  filasCache = Array.isArray(filas) ? filas : [];
+  return filasCache;
+}
+
+// Mientras la DB no devuelva `categoria`, se completa con lo guardado en el
+// teléfono (por local_id). Sin dato → 'personal'.
+function mapaCategoriasLocal(){
+  const m = {};
+  for(const x of leerLS()) if(x.local_id && x.categoria) m[x.local_id] = x.categoria;
+  return m;
+}
+const categoriaDe = (f, mapa) => f.categoria || (f.local_id && mapa[f.local_id]) || 'personal';
+
+// ---------- vistas ----------
+let destinoConClave = 'historial';
+function setVista(v){
+  ['cargar','gate','historial','resumen'].forEach(x => { $('vista-' + x).hidden = x !== v; });
+  $('tab-cargar').classList.toggle('act', v === 'cargar');
+  $('tab-historial').classList.toggle('act', v === 'historial' || (v === 'gate' && destinoConClave === 'historial'));
+  $('tab-resumen').classList.toggle('act', v === 'resumen' || (v === 'gate' && destinoConClave === 'resumen'));
+  if(v === 'historial') abrirHistorial();
+  if(v === 'resumen') abrirResumen();
+}
+function pedirVista(v){
+  if((v === 'historial' || v === 'resumen') && !localStorage.getItem(CLAVE_KEY)){
+    destinoConClave = v; setVista('gate'); return;
+  }
+  setVista(v);
+}
+$('tab-cargar').addEventListener('click', () => setVista('cargar'));
+$('tab-historial').addEventListener('click', () => pedirVista('historial'));
+$('tab-resumen').addEventListener('click', () => pedirVista('resumen'));
+$('refrescar-hist').addEventListener('click', () => abrirHistorial(true));
+$('refrescar-res').addEventListener('click', () => abrirResumen(true));
+
+$('clave-ok').addEventListener('click', () => {
+  const v = $('clave-input').value.trim();
+  if(!v) return;
+  localStorage.setItem(CLAVE_KEY, v);
+  setVista(destinoConClave);
+});
+function olvidarClave(destino){
+  localStorage.removeItem(CLAVE_KEY);
+  filasCache = null;
+  pedirVista(destino);
+}
+$('cambiar-clave-h').addEventListener('click', () => olvidarClave('historial'));
+$('cambiar-clave-r').addEventListener('click', () => olvidarClave('resumen'));
+
+// ---------- HISTORIAL ----------
+let buscaTimer = null;
+$('buscador').addEventListener('input', () => {
+  clearTimeout(buscaTimer);
+  buscaTimer = setTimeout(() => { filtro.q = $('buscador').value.trim().toLowerCase(); renderHistorial(); }, 180);
+});
+function initFiltro(id, campo){
+  $(id).addEventListener('click', e => {
+    const b = e.target.closest('.chip'); if(!b) return;
+    $(id).querySelectorAll('.chip').forEach(c => c.classList.remove('on'));
+    b.classList.add('on');
+    filtro[campo] = b.dataset.v;
+    renderHistorial();
+  });
+}
+initFiltro('filtro-categoria','categoria');
+initFiltro('filtro-metodo','metodo');
+
+async function abrirHistorial(force){
+  const cont = $('hist-lista');
+  $('cambiar-clave-h').hidden = true;
+  if(!filasCache || force){
+    cont.innerHTML = '<div class="vacio">Cargando…</div>';
+    $('hist-stats').textContent = '';
+    try{ await traerFilas(true); }
+    catch(e){
+      cont.innerHTML = '<div class="vacio"><b>' + (navigator.onLine ? 'Error del servidor' : 'Sin conexión') + '</b>Tocá ↻ Actualizar para probar de nuevo.</div>';
+      return;
+    }
+  }
+  renderHistorial();
+  $('cambiar-clave-h').hidden = false;
+}
+
+function coincide(f, mapa){
+  if(filtro.categoria !== 'todos' && categoriaDe(f, mapa) !== filtro.categoria) return false;
+  if(filtro.metodo !== 'todos' && f.metodo !== filtro.metodo) return false;
+  if(!filtro.q) return true;
+  const blob = [f.descripcion, f.tarjeta, METODO_TXT[f.metodo],
+                CAT_TXT[categoriaDe(f, mapa)], String(f.monto)].join(' ').toLowerCase();
+  return blob.includes(filtro.q);
+}
+
+function filaHTML(f, mapa){
+  const cat = categoriaDe(f, mapa);
+  const badge = f.metodo === 'credito'
+    ? '<span class="badge badge--credito">Crédito ' + (Number(f.cuotas) || 1) + '×</span>'
+    : '<span class="badge">' + (METODO_TXT[f.metodo] || esc(f.metodo)) + '</span>';
+  const extra = f.tarjeta ? '<span class="extra">' + esc(f.tarjeta) + '</span>' : '';
+  const rec = f.es_recurrente ? '<span class="badge badge--recurrente">🔁 fijo</span>' : '';
+  const neg = cat === 'negocio' ? '<span class="badge badge--negocio">Negocio</span>' : '';
+  const cola = f._pendiente ? '<span class="badge badge--cola">⏳ en cola</span>' : '';
+  return '<div class="gasto gasto--sinavatar gasto--' + cat + '">' +
+    '<div class="info"><div class="desc">' + esc(f.descripcion || '(sin detalle)') + '</div>' +
+    '<div class="meta">' + badge + extra + neg + rec + cola + '</div></div>' +
+    '<div class="importe"><div class="m money">' + fmt$(Number(f.monto)) + '</div>' +
+    '<div class="f">' + CAT_TXT[cat] + '</div></div>' +
+  '</div>';
+}
+
+function renderHistorial(){
+  const cont = $('hist-lista');
+  if(!filasCache) return;
+  const mapa = mapaCategoriasLocal();
+  const enServer = new Set(filasCache.map(f => f.local_id).filter(Boolean));
+  const pendientes = leerLS()
+    .filter(x => x.estado === 'pendiente' && !enServer.has(x.local_id))
+    .map(x => ({...x, _pendiente:true, id: Infinity}));
+  const todas = [...pendientes, ...filasCache]
+    .sort((a, b) => b.fecha.localeCompare(a.fecha) || (b.id || 0) - (a.id || 0));
+  const filtradas = todas.filter(f => coincide(f, mapa));
+
+  const totalF = filtradas.reduce((s, f) => s + Number(f.monto), 0);
+  $('hist-stats').textContent = filtradas.length
+    ? filtradas.length + ' gasto' + (filtradas.length === 1 ? '' : 's') + ' · ' + fmt$(totalF)
+    : '';
+
+  if(!filtradas.length){
+    cont.innerHTML = filasCache.length || pendientes.length
+      ? '<div class="vacio"><b>Nada con ese filtro</b>Probá con otra búsqueda.</div>'
+      : '<div class="vacio"><b>Sin datos</b>¿La clave está bien?</div>';
+    return;
+  }
+
+  let html = '', diaActual = null;
+  for(const f of filtradas){
+    if(f.fecha !== diaActual){
+      diaActual = f.fecha;
+      const delDia = filtradas.filter(x => x.fecha === f.fecha);
+      const totDia = delDia.reduce((s, x) => s + Number(x.monto), 0);
+      html += '<div class="dia-head"><span class="dia">' + esc(etiquetaDia(f.fecha)) + '</span>' +
+              '<b class="money">' + fmt$(totDia) + '</b></div>';
+    }
+    html += filaHTML(f, mapa);
+  }
+  cont.innerHTML = html;
 }
 
 // ---------- RESUMEN ----------
-async function abrirResumen(){
-  const cont = $('resumen-contenido');
+async function abrirResumen(force){
+  const cont = $('res-contenido');
   $('cambiar-clave-r').hidden = true;
-  cont.innerHTML = '<div class="vacio">Cargando…</div>';
-  let filas;
-  try{ filas = await traerFilas(); }
-  catch(e){
-    cont.innerHTML = '<div class="vacio"><b>' + (navigator.onLine ? 'Error del servidor' : 'Sin conexión') + '</b>Tocá ↻ Actualizar para probar de nuevo.</div>';
-    return;
+  $('actualizado').textContent = '';
+  if(!filasCache || force){
+    cont.innerHTML = '<div class="vacio">Cargando…</div>';
+    try{ await traerFilas(true); }
+    catch(e){
+      cont.innerHTML = '<div class="vacio"><b>' + (navigator.onLine ? 'Error del servidor' : 'Sin conexión') + '</b>Tocá ↻ Actualizar para probar de nuevo.</div>';
+      return;
+    }
   }
-  if(!filas.length){
+  if(!filasCache.length){
     cont.innerHTML = '<div class="vacio"><b>Sin datos</b>¿La clave está bien?</div>';
     $('cambiar-clave-r').hidden = false;
     return;
   }
-  renderResumen(filas);
+  renderResumen(filasCache);
   $('cambiar-clave-r').hidden = false;
-}
-
-function renderResumen(filas){
-  const hoy = new Date();
-  const ym = hoy.getFullYear() + '-' + String(hoy.getMonth()+1).padStart(2,'0');
-  const delMes = filas.filter(f => f.fecha.startsWith(ym));
-  const totalMes = delMes.reduce((s, f) => s + Number(f.monto), 0);
-  const totalHist = filas.reduce((s, f) => s + Number(f.monto), 0);
-
-  const porMetodo = {};
-  const porTarjeta = {};
-  for(const f of delMes){
-    porMetodo[f.metodo] = (porMetodo[f.metodo] || 0) + Number(f.monto);
-    if(f.tarjeta) porTarjeta[f.tarjeta] = (porTarjeta[f.tarjeta] || 0) + Number(f.monto);
-  }
-
-  let html =
-    '<section class="hero">' +
-      '<div class="etiqueta">Gastado este mes</div>' +
-      '<div class="total money">' + fmt$(totalMes) + '</div>' +
-      '<div class="sub">' + delMes.length + ' gasto' + (delMes.length === 1 ? '' : 's') +
-      ' · histórico ' + fmt$(totalHist) + '</div>' +
-    '</section>';
-
-  // Por método (mes actual)
-  const metodos = ['efectivo','transferencia','debito','credito'].filter(m => porMetodo[m]);
-  if(metodos.length){
-    const max = Math.max(...metodos.map(m => porMetodo[m]), 1);
-    html += '<section class="card"><h3>Este mes por método</h3><div class="bars">' +
-      metodos.map(m =>
-        '<div class="bar-row"><span class="lbl">' + METODO_TXT[m] + '</span>' +
-        '<div class="bar-track"><div class="bar-fill" style="--w:' + (porMetodo[m] / max * 100).toFixed(1) + '%"></div></div>' +
-        '<span class="cuanto money">' + fmt$(porMetodo[m]) + '</span></div>').join('') +
-      '</div></section>';
-  }
-
-  // Por tarjeta (mes actual, débito + crédito)
-  const tarjetas = Object.keys(porTarjeta);
-  if(tarjetas.length){
-    html += '<section class="card"><h3>Este mes por tarjeta</h3>' +
-      tarjetas.sort((a, b) => porTarjeta[b] - porTarjeta[a]).map(t =>
-        '<div class="tj-row"><span>' + esc(t) + '</span><b class="money">' + fmt$(porTarjeta[t]) + '</b></div>').join('') +
-      '</section>';
-  }
-
-  // Últimas compras
-  html += '<div class="seccion"><h2>Últimas compras</h2></div>';
-  const orden = [...filas].sort((a, b) => b.fecha.localeCompare(a.fecha) || b.id - a.id).slice(0, 30);
-  html += orden.map(f => {
-    const [y, m, d] = f.fecha.split('-').map(Number);
-    const fbon = d + ' ' + new Date(y, m - 1, d).toLocaleDateString('es-AR', {month:'short'}).replace('.','');
-    const badge = f.metodo === 'credito'
-      ? '<span class="badge badge--credito">Crédito ' + (Number(f.cuotas) || 1) + '×</span>'
-      : '<span class="badge">' + (METODO_TXT[f.metodo] || esc(f.metodo)) + '</span>';
-    const extra = f.tarjeta ? '<span class="badge">' + esc(f.tarjeta) + '</span>' : '';
-    const rec = f.es_recurrente ? '<span class="badge badge--recurrente">🔁 fijo</span>' : '';
-    return '<div class="gasto">' +
-      '<div class="info" style="min-width:0"><div class="desc">' + esc(f.descripcion || '(sin detalle)') + '</div>' +
-      '<div class="meta">' + badge + extra + rec + '</div></div>' +
-      '<div class="importe"><div class="m money">' + fmt$(Number(f.monto)) + '</div><div class="f">' + fbon + '</div></div>' +
-    '</div>';
-  }).join('');
-
-  $('resumen-contenido').innerHTML = html;
-}
-
-// ---------- PRÓXIMOS ----------
-async function abrirProximos(){
-  const cont = $('meses');
-  $('prox-nota').hidden = true;
-  $('cambiar-clave-p').hidden = true;
-  cont.innerHTML = '<div class="vacio">Cargando…</div>';
-  let filas;
-  try{ filas = await traerFilas(); }
-  catch(e){
-    cont.innerHTML = '<div class="vacio"><b>' + (navigator.onLine ? 'Error del servidor' : 'Sin conexión') + '</b>Probá de nuevo en un rato.</div>';
-    return;
-  }
-  if(!filas.length){
-    cont.innerHTML = '<div class="vacio"><b>Sin datos</b>¿La clave está bien?</div>';
-    $('cambiar-clave-p').hidden = false;
-    return;
-  }
-  renderMeses(proyectar(filas));
-  $('prox-nota').hidden = false;
-  $('cambiar-clave-p').hidden = false;
+  $('actualizado').textContent = 'Actualizado ' + new Date().toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'});
 }
 
 // Regla: TODA compra a crédito impacta los meses siguientes (aun en 1 cuota).
-// Recurrentes se repiten cada mes; si algo es crédito Y recurrente, manda el crédito (sin doble conteo).
+// Recurrentes cada mes; crédito + recurrente: manda el crédito (sin doble conteo).
 function proyectar(filas){
   const hoy = new Date();
   const meses = [];
@@ -657,33 +603,158 @@ function proyectar(filas){
   return meses;
 }
 
-function renderMeses(meses){
-  const cont = $('meses');
-  cont.innerHTML = '';
-  let algo = false;
-  for(const mes of meses){
-    if(!mes.items.length) continue;
-    algo = true;
-    const total = mes.items.reduce((s, i) => s + i.v, 0);
-    const nombre = new Date(mes.y, mes.m, 1).toLocaleDateString('es-AR', {month:'long', year:'numeric'});
-    const card = document.createElement('div');
-    card.className = 'mes-card';
-    card.innerHTML =
-      '<div class="mes-head"><span class="mes-nombre">' + esc(nombre) + '</span><span class="mes-total money">' + fmt$(total) + '</span></div>' +
-      mes.items.map(i =>
-        '<div class="mes-item"><span class="dos-lineas">' +
-          '<span class="mes-t">' + (i.rec ? '🔁 ' : '') + esc(i.t) + '</span>' +
-          '<span class="mes-sub">' + esc(i.sub) + '</span></span>' +
-        (i.cuota ? '<span class="cuota-n">' + i.cuota + '</span>' : '') +
-        '<b class="money">' + fmt$(i.v) + '</b></div>').join('');
-    cont.appendChild(card);
+function barPath(x, y, w, h, r){
+  r = Math.min(r, h);
+  return 'M' + x + ' ' + (y + h) + ' V' + (y + r) +
+         ' Q' + x + ' ' + y + ' ' + (x + r) + ' ' + y +
+         ' H' + (x + w - r) +
+         ' Q' + (x + w) + ' ' + y + ' ' + (x + w) + ' ' + (y + r) +
+         ' V' + (y + h) + ' Z';
+}
+
+function chartMeses(filas, color){
+  const hoy = new Date();
+  const labs = [], vals = [];
+  for(let k = 5; k >= 0; k--){
+    const d = new Date(hoy.getFullYear(), hoy.getMonth() - k, 1);
+    const ym = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    labs.push(d.toLocaleDateString('es-AR', {month:'short'}).replace('.',''));
+    vals.push(filas.filter(f => f.fecha.startsWith(ym)).reduce((s, f) => s + Number(f.monto), 0));
   }
-  if(!algo) cont.innerHTML = '<div class="vacio"><b>Nada proyectado</b>Sin cuotas pendientes ni gastos recurrentes.</div>';
+  const max = Math.max(...vals, 1);
+  const W = 320, base = 124, top = 26, bw = 34;
+  const gap = (W - 6 * bw) / 7;
+  let s = '<svg class="grafico" viewBox="0 0 320 150" role="img" aria-label="Gasto por mes: ' +
+    labs.map((l, i) => l + ' ' + fmt$(vals[i])).join(', ') + '">';
+  s += '<line x1="0" y1="' + (base + .5) + '" x2="320" y2="' + (base + .5) + '" stroke="rgba(232,226,213,.18)" stroke-width="1"/>';
+  vals.forEach((v, i) => {
+    const x = gap + (bw + gap) * i;
+    const h = Math.max(v / max * (base - top), 2);
+    const y = base - h;
+    const cur = i === 5;
+    s += '<path d="' + barPath(x, y, bw, h, 4) + '" fill="' + color + '"' + (cur ? '' : ' opacity=".55"') + '/>';
+    s += '<text x="' + (x + bw/2) + '" y="' + (y - 6) + '" class="g-val' + (cur ? ' g-val--cur' : '') + '" text-anchor="middle">' + (v ? fmtK(v) : '—') + '</text>';
+    s += '<text x="' + (x + bw/2) + '" y="142" class="g-lab" text-anchor="middle">' + esc(labs[i]) + '</text>';
+  });
+  s += '</svg>';
+  return s;
+}
+
+function renderResumen(filas){
+  const mapa = mapaCategoriasLocal();
+  const hoy = new Date();
+  const ym = hoy.getFullYear() + '-' + String(hoy.getMonth()+1).padStart(2,'0');
+  const delMes = filas.filter(f => f.fecha.startsWith(ym));
+  const totalMes = delMes.reduce((s, f) => s + Number(f.monto), 0);
+  const totalHist = filas.reduce((s, f) => s + Number(f.monto), 0);
+
+  const porCat = {personal:0, negocio:0};
+  const porMetodo = {};
+  const porTarjeta = {};
+  for(const f of delMes){
+    porCat[categoriaDe(f, mapa)] += Number(f.monto);
+    porMetodo[f.metodo] = (porMetodo[f.metodo] || 0) + Number(f.monto);
+    if(f.tarjeta) porTarjeta[f.tarjeta] = (porTarjeta[f.tarjeta] || 0) + Number(f.monto);
+  }
+  const pctCat = c => totalMes ? (porCat[c] / totalMes * 100) : 0;
+
+  const d30 = new Date(); d30.setDate(d30.getDate() - 30);
+  const corte30 = isoLocal(d30);
+  const ult30 = filas.filter(f => f.fecha >= corte30);
+  const total30 = ult30.reduce((s, f) => s + Number(f.monto), 0);
+
+  const meses = proyectar(filas).filter(m => m.items.length);
+  const comprometido = meses.reduce((s, m) => s + m.items.reduce((x, i) => x + i.v, 0), 0);
+
+  // HERO: gastado este mes + onda firma + split Negocio / Personal
+  let html =
+    '<section class="hero">' +
+      '<div class="etiqueta">Gastado este mes</div>' +
+      '<div class="total money">' + fmt$(totalMes) + '</div>' +
+      '<svg class="onda" viewBox="0 0 220 14" aria-hidden="true">' +
+        '<path d="M2 8 Q30 2 58 8 T114 8 T170 8 T226 8" fill="none" stroke="#C98F5F" stroke-width="1.6" stroke-linecap="round" opacity=".7"/>' +
+      '</svg>' +
+      '<div class="sub">' + delMes.length + ' gasto' + (delMes.length === 1 ? '' : 's') +
+      ' · histórico ' + fmt$(totalHist) + '</div>';
+  if(totalMes){
+    html +=
+      '<div class="stacked" role="img" aria-label="Personal ' + Math.round(pctCat('personal')) + '%, Negocio ' + Math.round(pctCat('negocio')) + '%">' +
+        ['personal','negocio'].filter(c => porCat[c] > 0).map(c =>
+          '<i style="width:' + pctCat(c).toFixed(1) + '%; background:var(--c-' + c + ')"></i>').join('') +
+      '</div>' +
+      '<div class="leyenda">' +
+        ['personal','negocio'].map(c =>
+          '<span><i style="background:var(--c-' + c + ')"></i>' + CAT_TXT[c] + ' <b>' + fmt$(porCat[c]) + '</b></span>').join('') +
+      '</div>';
+  }
+  html += '</section>';
+
+  // STATS
+  html += '<div class="stat-grid">' +
+    '<div class="stat-card stat-card--pearl">' +
+      '<div class="lbl">Últimos 30 días</div>' +
+      '<div class="val money">' + fmt$(total30) + '</div>' +
+      '<div class="sub">' + ult30.length + ' gasto' + (ult30.length === 1 ? '' : 's') + '</div>' +
+    '</div>' +
+    '<div class="stat-card stat-card--copper">' +
+      '<div class="lbl">Comprometido</div>' +
+      '<div class="val money">' + fmt$(comprometido) + '</div>' +
+      '<div class="sub">cuotas + fijos que vienen</div>' +
+    '</div></div>';
+
+  // POR MÉTODO (mes actual)
+  const metodos = ['efectivo','transferencia','debito','credito'].filter(m => porMetodo[m]);
+  if(metodos.length){
+    const max = Math.max(...metodos.map(m => porMetodo[m]), 1);
+    html += '<section class="card"><h3>Este mes por método</h3><div class="bars bars--metodo">' +
+      metodos.map(m =>
+        '<div class="bar-row"><span class="quien">' + METODO_TXT[m] + '</span>' +
+        '<div class="bar-track"><div class="bar-fill" style="--w:' + (porMetodo[m] / max * 100).toFixed(1) + '%"></div></div>' +
+        '<span class="cuanto money">' + fmt$(porMetodo[m]) + '</span></div>').join('') +
+      '</div></section>';
+  }
+
+  // POR TARJETA (mes actual)
+  const tarjetas = Object.keys(porTarjeta);
+  if(tarjetas.length){
+    html += '<section class="card"><h3>Este mes por tarjeta</h3>' +
+      tarjetas.sort((a, b) => porTarjeta[b] - porTarjeta[a]).map(t =>
+        '<div class="tj-row"><span>' + esc(t) + '</span><b class="money">' + fmt$(porTarjeta[t]) + '</b></div>').join('') +
+      '</section>';
+  }
+
+  // GASTO POR MES
+  html += '<section class="card"><h3>Gasto por mes</h3>' + chartMeses(filas, '#E8E2D5') + '</section>';
+
+  // COMPROMISOS QUE VIENEN
+  html += '<div class="seccion"><h2>Compromisos que vienen</h2></div>';
+  if(meses.length){
+    html += meses.map(mes => {
+      const t = mes.items.reduce((s, i) => s + i.v, 0);
+      let nombre = new Date(mes.y, mes.m, 1).toLocaleDateString('es-AR', {month:'long'});
+      nombre = nombre.charAt(0).toUpperCase() + nombre.slice(1);
+      if(mes.y !== new Date().getFullYear()) nombre += ' ' + mes.y;
+      return '<div class="mes-card">' +
+        '<div class="mes-head"><span class="mes-nombre">' + esc(nombre) + '</span><span class="mes-total money">' + fmt$(t) + '</span></div>' +
+        mes.items.map(i =>
+          '<div class="mes-item"><span class="dos-lineas">' +
+            '<span class="mes-t">' + (i.rec ? '🔁 ' : '') + esc(i.t) + '</span>' +
+            '<span class="mes-sub">' + esc(i.sub) + '</span></span>' +
+          (i.cuota ? '<span class="cuota-n">' + i.cuota + '</span>' : '') +
+          '<b class="money">' + fmt$(i.v) + '</b></div>').join('') +
+        '</div>';
+    }).join('');
+    html += '<p class="pie">Suma cuotas de crédito + gastos que se repiten. Las cuotas empiezan el mes siguiente a la compra.</p>';
+  } else {
+    html += '<div class="vacio"><b>Nada proyectado</b>Sin cuotas pendientes ni gastos recurrentes.</div>';
+  }
+
+  $('res-contenido').innerHTML = html;
 }
 
 // ---------- arranque ----------
-if(location.hash === '#proximos') pedirVista('proximos');
-if(location.hash === '#resumen') pedirVista('resumen');
+if(location.hash === '#historial') pedirVista('historial');
+if(location.hash === '#resumen' || location.hash === '#proximos') pedirVista('resumen');
 reintentarPendientes(false);
 refrescarPendientes();
 if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');

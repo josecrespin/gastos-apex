@@ -1,12 +1,12 @@
 {
-  "name": "Gastos José · Apex Sync",
-  "short_name": "Gastos José",
+  "name": "Finanzas José · Apex Sync",
+  "short_name": "Finanzas José",
   "description": "Finanzas personales de José — Apex Sync",
   "start_url": ".",
   "scope": ".",
   "display": "standalone",
-  "background_color": "#0c100d",
-  "theme_color": "#0c100d",
+  "background_color": "#0F272E",
+  "theme_color": "#0F272E",
   "icons": [
     { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }

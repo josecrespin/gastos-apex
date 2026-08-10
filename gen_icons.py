@@ -1,46 +1,72 @@
-# Genera los íconos AS (Apex Sync) de ambas PWAs:
-#   raíz  = Obras (azul)   ·   personal/ = Gastos José (verde)
-import os
-from PIL import Image, ImageDraw, ImageFont
+# Genera los íconos de ambas PWAs — marca Apex Sync "Deep Teal" v2:
+# fondo degradé deep teal → abyss, vértice (triángulo trazo fino) + onda.
+#   raíz      = Obras     (triángulo pearl + onda copper)
+#   personal/ = Fin. José (triángulo copper + onda pearl)
+import os, math
+from PIL import Image, ImageDraw
 
-FONDO = (12, 13, 16)
-PALETAS = {
-    '.':        ((79, 124, 255), (59, 95, 217)),   # azul obras
-    'personal': ((47, 191, 113), (36, 154, 89)),   # verde personal
-}
+DEEP   = (20, 49, 58)     # #14313A
+ABYSS  = (15, 39, 46)     # #0F272E
+PEARL  = (232, 226, 213)  # #E8E2D5
+COPPER = (201, 143, 95)   # #C98F5F
 
-def degrade(size, c1, c2):
-    img = Image.new('RGB', (size, size), FONDO)
+S = 4  # supersampling para bordes suaves
+
+def fondo(s):
+    img = Image.new('RGB', (s, s), ABYSS)
     d = ImageDraw.Draw(img)
-    for y in range(size):
-        t = y / size
-        c = tuple(int(c1[i] + (c2[i] - c1[i]) * t) for i in range(3))
-        d.line([(0, y), (size, y)], fill=c)
+    for y in range(s):
+        t = y / s
+        c = tuple(int(DEEP[i] + (ABYSS[i] - DEEP[i]) * t) for i in range(3))
+        d.line([(0, y), (s, y)], fill=c)
     return img
 
-def fuente(px):
-    for ruta in ('/System/Library/Fonts/Helvetica.ttc',
-                 '/System/Library/Fonts/Supplemental/Arial Bold.ttf'):
-        try:
-            return ImageFont.truetype(ruta, px, index=1)  # index 1 = bold en Helvetica.ttc
-        except Exception:
-            try:
-                return ImageFont.truetype(ruta, px)
-            except Exception:
-                continue
-    return ImageFont.load_default()
+def triangulo(d, s, color, w):
+    apex = (0.5 * s, 0.195 * s)
+    bl = (0.235 * s, 0.72 * s)
+    br = (0.765 * s, 0.72 * s)
+    d.line([bl, apex, br, bl, apex], fill=color, width=w, joint='curve')
 
-def icono(size, ruta, c1, c2):
-    img = degrade(size, c1, c2)
+def onda(d, s, color, w):
+    # Polígono relleno entre la curva desplazada ±w/2 por su normal
+    # (una polilínea gruesa deja flecos en los joints de PIL).
+    x0, x1 = 0.14 * s, 0.86 * s
+    yc, a = 0.635 * s, 0.048 * s
+    n = 160
+    centro = []
+    for i in range(n + 1):
+        x = x0 + (x1 - x0) * i / n
+        ph = (x - x0) / (x1 - x0) * 2 * math.pi
+        centro.append((x, yc + a * math.sin(ph)))
+    arriba, abajo = [], []
+    for i, (x, y) in enumerate(centro):
+        j0, j1 = max(0, i - 1), min(n, i + 1)
+        dx = centro[j1][0] - centro[j0][0]
+        dy = centro[j1][1] - centro[j0][1]
+        L = math.hypot(dx, dy) or 1
+        nx, ny = -dy / L, dx / L
+        arriba.append((x + nx * w / 2, y + ny * w / 2))
+        abajo.append((x - nx * w / 2, y - ny * w / 2))
+    d.polygon(arriba + abajo[::-1], fill=color)
+    # puntas redondeadas
+    for (x, y) in (centro[0], centro[-1]):
+        d.ellipse([x - w/2, y - w/2, x + w/2, y + w/2], fill=color)
+
+def icono(size, ruta, tri, wave):
+    s = size * S
+    img = fondo(s)
     d = ImageDraw.Draw(img)
-    f = fuente(int(size * 0.42))
-    caja = d.textbbox((0, 0), 'AS', font=f)
-    w, h = caja[2] - caja[0], caja[3] - caja[1]
-    d.text(((size - w) / 2 - caja[0], (size - h) / 2 - caja[1]), 'AS', font=f, fill=(255, 255, 255))
+    triangulo(d, s, tri, max(2, int(0.030 * s)))
+    onda(d, s, wave, max(2, int(0.044 * s)))
+    img = img.resize((size, size), Image.LANCZOS)
     img.save(ruta, 'PNG')
     print(ruta, size)
 
-for carpeta, (c1, c2) in PALETAS.items():
+VARIANTES = {
+    '.':        (PEARL, COPPER),
+    'personal': (COPPER, PEARL),
+}
+for carpeta, (tri, wave) in VARIANTES.items():
     os.makedirs(carpeta, exist_ok=True)
     for size in (180, 192, 512):
-        icono(size, os.path.join(carpeta, f'icon-{size}.png'), c1, c2)
+        icono(size, os.path.join(carpeta, f'icon-{size}.png'), tri, wave)

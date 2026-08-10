@@ -537,3 +537,17 @@ a.tab{ text-decoration:none; }
   transition:transform var(--t-fast), background var(--t-fast);
 }
 .icon-btn:active{ transform:scale(.96); background:var(--surface-2); }
+
+/* ==========================================================================
+   VARIANTE PERSONAL — "Finanzas José": acento pearl, más sobrio.
+   Misma familia Deep Teal; el cobre queda reservado a compromisos
+   (crédito, cuotas, categoría Negocio) y a la onda del logo.
+   ========================================================================== */
+:root{
+  --accent:      #E8E2D5;                    /* pearl */
+  --accent-hi:   #F5F0E4;
+  --accent-deep: #CBBFA4;
+  --accent-soft: rgba(232,226,213,.14);
+  --on-accent:   #20261F;
+  --glow-accent: 0 10px 28px -10px rgba(232,226,213,.28);
+}
