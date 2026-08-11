@@ -2,7 +2,7 @@
 // Facu ve siempre la última versión apenas hay señal; el cache queda
 // como respaldo offline. Scope: /gastos-apex/personal-facu/.
 // El CSS compartido (../apex-sync.css) también se cachea acá.
-const CACHE = 'gastos-facu-v1';
+const CACHE = 'gastos-facu-v2';
 const SHELL = ['.', 'index.html', '../apex-sync.css', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {

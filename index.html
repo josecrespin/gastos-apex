@@ -98,6 +98,19 @@
   <div class="grupo">
     <button id="btn-foto" class="chip chip--toggle">📷 Foto de la factura</button>
     <input id="foto-input" type="file" accept="image/*" hidden>
+    <button id="recurrente" class="chip chip--toggle" style="margin-top:10px">🔁 Gasto que se repite</button>
+  </div>
+
+  <div class="grupo" id="grupo-rec-meses" hidden>
+    <label>¿Cuántos meses?</label>
+    <div class="chips chips--compact" id="chips-rec-meses">
+      <button class="chip" data-v="2">2</button>
+      <button class="chip" data-v="3">3</button>
+      <button class="chip" data-v="6">6</button>
+      <button class="chip on" data-v="12">12</button>
+      <button class="chip" data-v="24">24</button>
+      <button class="chip" data-v="inf">Sin fin</button>
+    </div>
   </div>
 
   <button id="guardar" class="btn-primary">Guardar gasto</button>
@@ -188,7 +201,7 @@ const METODOS_POR_PERSONA = {
   agus: ['efectivo','transferencia'],
 };
 
-const sel = { fecha:'hoy', proyecto:'fagu_obra', quien:'jose', metodo:'efectivo', tarjeta:'Visa Francés BBVA', cuotas:1 };
+const sel = { fecha:'hoy', proyecto:'fagu_obra', quien:'jose', metodo:'efectivo', tarjeta:'Visa Francés BBVA', cuotas:1, recurrente:false, recMeses:'12' };
 const filtro = { q:'', quien:'todos', proyecto:'todos' };
 
 // ---------- helpers ----------
@@ -277,7 +290,18 @@ function aplicarReglaMetodos(){
 }
 aplicarReglaMetodos();
 
-// (Sin gastos recurrentes acá: eso es de las finanzas personales, no de obras.)
+// v4: los recurrentes VUELVEN a obras (pedido de José 11-ago). Mismo control
+// que en las finanzas personales: "se repite N meses" (2-24) o sin fin.
+// Crédito + recurrente: manda el crédito (las cuotas ya proyectan solas).
+const recEl = $('recurrente');
+function pintarRec(){
+  recEl.classList.toggle('on', sel.recurrente);
+  recEl.textContent = !sel.recurrente ? '🔁 Gasto que se repite'
+    : (sel.recMeses === 'inf' ? '🔁 Se repite sin fin' : '🔁 Se repite ' + sel.recMeses + ' meses');
+  $('grupo-rec-meses').hidden = !sel.recurrente;
+}
+recEl.addEventListener('click', () => { sel.recurrente = !sel.recurrente; pintarRec(); });
+initChips('chips-rec-meses','recMeses', pintarRec);
 
 // ---------- foto ----------
 const fotoInput = $('foto-input');
@@ -327,8 +351,9 @@ function escribirLS(a){ localStorage.setItem(LS_KEY, JSON.stringify(a)); }
 // OJO: no se usa on_conflict/ignore-duplicates porque el RLS es insert-only
 // (sin SELECT para anon) y ese modo necesita leer la fila en conflicto.
 // Resiliencia de esquema: si a la DB le falta una columna nueva (p.ej.
-// `relevar` antes de correr SETUP-GASTOS-V6.sql), se reintenta sin ella.
-const OPCIONALES = {local_id:true, relevar:true};
+// `recurrente_meses` antes de correr SETUP-GASTOS-V7.sql), se reintenta
+// sin ella — la marca queda solo local hasta que corra el SQL.
+const OPCIONALES = {local_id:true, relevar:true, recurrente_meses:true};
 
 async function postSupabase(gasto){
   for(let i = 0; i <= Object.keys(OPCIONALES).length; i++){
@@ -412,9 +437,11 @@ btn.addEventListener('click', async () => {
     metodo: sel.metodo,
     tarjeta: tarjeta,
     cuotas: esCredito ? sel.cuotas : 1,
+    es_recurrente: sel.recurrente,
     foto_path: foto_path,
     local_id: uuid(),
   };
+  if(sel.recurrente && sel.recMeses !== 'inf') gasto.recurrente_meses = Number(sel.recMeses);
   if(!monto && hayFoto) gasto.relevar = true;
 
   const hist = leerLS();
@@ -448,6 +475,9 @@ btn.addEventListener('click', async () => {
     montoEl.value = ''; $('descripcion').value = '';
     sel.fecha = 'hoy'; $('fecha').hidden = true; $('fecha').value = '';
     document.querySelectorAll('#chips-fecha .chip').forEach(c => c.classList.toggle('on', c.dataset.v === 'hoy'));
+    sel.recurrente = false; sel.recMeses = '12';
+    document.querySelectorAll('#chips-rec-meses .chip').forEach(c => c.classList.toggle('on', c.dataset.v === '12'));
+    pintarRec();
     fotoInput.value = ''; btnFoto.classList.remove('on'); btnFoto.textContent = '📷 Foto de la factura';
     $('foto-hint').hidden = true;
   }, 1500);
@@ -563,6 +593,8 @@ function filaHTML(f){
     ? '<span class="badge badge--credito">Crédito ' + (Number(f.cuotas) || 1) + '×</span>'
     : '<span class="badge">' + (METODO_TXT[f.metodo] || esc(f.metodo)) + '</span>';
   const extra = f.tarjeta ? '<span class="extra">' + esc(f.tarjeta) + '</span>' : '';
+  const rec = f.es_recurrente
+    ? '<span class="badge badge--recurrente">🔁 ' + (Number(f.recurrente_meses) ? Number(f.recurrente_meses) + ' meses' : 'fijo') + '</span>' : '';
   const rev = f.relevar ? '<span class="badge badge--relevar">🔎 Jarvis la está leyendo</span>' : '';
   const cola = f._pendiente ? '<span class="badge badge--cola">⏳ en cola</span>' : '';
   const thumb = f.foto_path
@@ -571,7 +603,7 @@ function filaHTML(f){
   return '<div class="gasto gasto--' + (PROY_CLASE[f.proyecto] || 'obra') + (thumb ? ' gasto--conthumb' : '') + '">' +
     '<div class="avatar avatar--' + esc(f.quien) + '">' + (INICIAL[f.quien] || '?') + '</div>' +
     '<div class="info"><div class="desc">' + esc(f.descripcion || '(sin detalle)') + '</div>' +
-    '<div class="meta">' + badge + extra + rev + cola + '</div></div>' +
+    '<div class="meta">' + badge + extra + rec + rev + cola + '</div></div>' +
     thumb +
     '<div class="importe"><div class="m money">' + importe + '</div>' +
     '<div class="f">' + (NOMBRES[f.quien] || '') + '</div></div>' +
@@ -668,7 +700,9 @@ async function abrirResumen(force){
 }
 
 // Regla: TODA compra a crédito impacta los meses siguientes (aun en 1 cuota).
-// (Sin recurrentes en obras: los gastos fijos van en las finanzas personales.)
+// Recurrentes (v4): respetan el horizonte elegido — N meses en total (el
+// gasto cargado cuenta como pago 1) o sin fin si no se puso límite.
+// Crédito + recurrente: manda el crédito (sin doble conteo).
 function proyectar(filas){
   const hoy = new Date();
   const meses = [];
@@ -683,6 +717,15 @@ function proyectar(filas){
     const etiqueta = f.descripcion || '(sin detalle)';
     const sub = (NOMBRES[f.quien] || f.quien) + ' · ' + (PROYECTOS[f.proyecto] || f.proyecto);
     const esCredito = f.metodo === 'credito';
+    if(f.es_recurrente && !esCredito){
+      const N = Number(f.recurrente_meses) || 0;   // 0 = sin fin
+      for(let k = Math.max(0, base + 1); k < meses.length; k++){
+        const nro = k - base + 1;                  // el gasto original fue el pago 1
+        if(N && nro > N) break;
+        meses[k].items.push({t: etiqueta, sub, rec:true,
+                             cuota: N ? nro + '/' + N : null, v: Number(f.monto)});
+      }
+    }
     if(esCredito){
       const n = Math.max(1, Number(f.cuotas) || 1);
       const cuota = Number(f.monto) / n;
@@ -794,7 +837,7 @@ function renderResumen(filas){
   html += '<div class="stat-card stat-card--copper">' +
       '<div class="lbl">Comprometido</div>' +
       '<div class="val money">' + fmt$(comprometido) + '</div>' +
-      '<div class="sub">cuotas que vienen</div>' +
+      '<div class="sub">cuotas + fijos que vienen</div>' +
     '</div>';
   html += '</div>';
 
@@ -831,9 +874,9 @@ function renderResumen(filas){
           '<b class="money">' + fmt$(i.v) + '</b></div>').join('') +
         '</div>';
     }).join('');
-    html += '<p class="pie">Suma las cuotas de crédito, que empiezan el mes siguiente a la compra.</p>';
+    html += '<p class="pie">Suma cuotas de crédito + gastos que se repiten. Las cuotas empiezan el mes siguiente a la compra.</p>';
   } else {
-    html += '<div class="vacio"><b>Nada proyectado</b>Sin cuotas de crédito pendientes.</div>';
+    html += '<div class="vacio"><b>Nada proyectado</b>Sin cuotas pendientes ni gastos recurrentes.</div>';
   }
 
   $('res-contenido').innerHTML = html;

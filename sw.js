@@ -2,7 +2,7 @@
 // ven siempre la última versión apenas hay señal; el cache queda solo
 // como respaldo offline. Íconos/manifest siguen cache-first (no cambian).
 // Los POST a Supabase nunca pasan por acá (solo GET same-origin).
-const CACHE = 'gastos-obras-v7';
+const CACHE = 'gastos-obras-v8';
 const SHELL = ['.', 'index.html', 'dashboard.html', 'apex-sync.css',
                'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
 
