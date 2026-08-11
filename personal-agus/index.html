@@ -3,14 +3,28 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<title>Obras · Apex Sync</title>
+<title>Gastos Agus · Apex Sync</title>
 <meta name="theme-color" content="#0F272E">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Obras AS">
-<link rel="stylesheet" href="apex-sync.css">
+<meta name="apple-mobile-web-app-title" content="Gastos Agus">
+<link rel="stylesheet" href="../apex-sync.css">
+<style>
+/* ==== VARIANTE AGUS — acento pearl (identidad: --p-agus del design system).
+   La base viene de ../apex-sync.css (compartida, no se duplica). ==== */
+:root{
+  --accent:      #E8E2D5;
+  --accent-hi:   #F5F0E4;
+  --accent-deep: #CBBFA4;
+  --accent-soft: rgba(232,226,213,.14);
+  --on-accent:   #20261F;
+  --glow-accent: 0 10px 28px -10px rgba(232,226,213,.28);
+}
+/* Sin categorías acá: el filete de cada gasto lleva el color de la app */
+.gasto{ --edge: var(--accent); }
+</style>
 </head>
 <body>
 
@@ -19,7 +33,7 @@
     <path d="M16 4.5 L27.5 26 H4.5 Z" fill="none" stroke="#E8E2D5" stroke-width="1.6" stroke-linejoin="round"/>
     <path d="M3 20.5 Q9.5 15.5 16 20.5 T29 20.5" fill="none" stroke="#C98F5F" stroke-width="2.2" stroke-linecap="round"/>
   </svg>
-  <h1><b>Obras</b> · Apex Sync</h1>
+  <h1><b>Gastos Agus</b> · Apex Sync</h1>
   <span class="periodo" id="periodo"></span>
 </header>
 
@@ -34,7 +48,7 @@
   </div>
 
   <div class="grupo">
-    <input id="descripcion" class="field" type="text" autocomplete="off" placeholder="¿En qué? (ej: membrana, SAT, cemento)">
+    <input id="descripcion" class="field" type="text" autocomplete="off" placeholder="¿En qué? (ej: nafta, super, salida)">
   </div>
 
   <div class="grupo">
@@ -45,23 +59,6 @@
       <button class="chip" data-v="otra">Otra</button>
     </div>
     <input id="fecha" class="field" type="date" style="margin-top:10px" hidden>
-  </div>
-
-  <div class="grupo">
-    <label>Obra</label>
-    <div class="chips" id="chips-proyecto">
-      <button class="chip chip--obra on" data-v="fagu_obra">Obra FAGU</button>
-      <button class="chip chip--tafi" data-v="tafi">Casa Tafí</button>
-    </div>
-  </div>
-
-  <div class="grupo">
-    <label>Pagó</label>
-    <div class="chips" id="chips-quien">
-      <button class="chip chip--jose on" data-v="jose">Yo</button>
-      <button class="chip chip--facu" data-v="facu">Facu</button>
-      <button class="chip chip--agus" data-v="agus">Agus</button>
-    </div>
   </div>
 
   <div class="grupo">
@@ -77,9 +74,8 @@
   <div class="grupo" id="grupo-tarjeta" hidden>
     <label>Tarjeta</label>
     <div class="chips" id="chips-tarjeta">
-      <button class="chip on" data-v="Visa Francés BBVA">V. Francés BBVA</button>
-      <button class="chip" data-v="Visa BBVA">V. BBVA</button>
-      <button class="chip" data-v="Nación">Nación</button>
+      <button class="chip on" data-v="Visa">Visa</button>
+      <button class="chip" data-v="Mastercard">Mastercard</button>
       <button class="chip" data-v="__otra">Otra</button>
     </div>
     <input id="tarjeta-otra" class="field" type="text" placeholder="¿Qué tarjeta?" style="margin-top:10px" hidden>
@@ -105,7 +101,7 @@
   <div style="text-align:center"><button class="pendientes" id="pendientes"></button></div>
 
   <footer class="pie">
-    Se guarda al instante · quedó a la vista de los tres en el Historial
+    Se guarda al instante · Se ve solo con tu clave
     <br><button class="lnk" id="exportar">Exportar respaldo</button>
   </footer>
 </main>
@@ -113,7 +109,7 @@
 <!-- ============ GATE DE CLAVE (compartido) ============ -->
 <main id="vista-gate" hidden>
   <div class="gate">
-    <p>Clave familiar (una sola vez):</p>
+    <p>Tu clave para ver tus números (una sola vez):</p>
     <input id="clave-input" class="field" type="text" autocomplete="off" placeholder="clave">
     <button id="clave-ok" class="btn-primary">Entrar</button>
   </div>
@@ -123,16 +119,12 @@
 <main id="vista-historial" hidden>
   <div class="seccion"><h2>Historial</h2><button class="accion" id="refrescar-hist">↻ Actualizar</button></div>
   <input id="buscador" class="field field--busca" type="search" autocomplete="off" placeholder="Buscar gasto, tarjeta, monto…">
-  <div class="filtros" id="filtro-quien">
+  <div class="filtros" id="filtro-metodo">
     <button class="chip on" data-v="todos">Todos</button>
-    <button class="chip chip--jose" data-v="jose">José</button>
-    <button class="chip chip--facu" data-v="facu">Facu</button>
-    <button class="chip chip--agus" data-v="agus">Agus</button>
-  </div>
-  <div class="filtros" id="filtro-proyecto">
-    <button class="chip on" data-v="todos">Ambas obras</button>
-    <button class="chip chip--obra" data-v="fagu_obra">Obra FAGU</button>
-    <button class="chip chip--tafi" data-v="tafi">Casa Tafí</button>
+    <button class="chip" data-v="efectivo">Efectivo</button>
+    <button class="chip" data-v="transferencia">Transf.</button>
+    <button class="chip" data-v="debito">Débito</button>
+    <button class="chip" data-v="credito">Crédito</button>
   </div>
   <p class="hist-stats" id="hist-stats"></p>
   <div id="hist-lista"></div>
@@ -169,27 +161,17 @@
 <script>
 const SUPABASE_URL = 'https://kfiywiqivibktzakclyv.supabase.co';
 const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtmaXl3aXFpdmlia3R6YWtjbHl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyMTA1MTgsImV4cCI6MjA5ODc4NjUxOH0.Z1DQW5ySGolzrjsqeesg824cpctqa04BOS2RSH4NTNo';
-const TABLA = 'gastos_obras';
-const RPC_LISTA = 'gastos_obras_lista';
-const LS_KEY = 'gastos_obras_v1';
-const CLAVE_KEY = 'gastos_obras_clave';
+const TABLA = 'gastos_agus';
+const RPC_LISTA = 'gastos_agus_lista';
+const LS_KEY = 'gastos_agus_v1';
+const CLAVE_KEY = 'gastos_agus_clave';
+const ACCENT = '#E8E2D5';
 const H = {'apikey': ANON_KEY, 'Authorization': 'Bearer ' + ANON_KEY};
 
-const NOMBRES = {jose:'José', facu:'Facu', agus:'Agus'};
-const INICIAL = {jose:'J', facu:'F', agus:'A'};
-const PROYECTOS = {fagu_obra:'Obra FAGU', tafi:'Casa Tafí'};
-const PROY_CLASE = {fagu_obra:'obra', tafi:'tafi'};
 const METODO_TXT = {efectivo:'Efectivo', transferencia:'Transferencia', debito:'Débito', credito:'Crédito'};
 
-// Regla de negocio: José usa los 4 métodos; Facu y Agus solo efectivo/transferencia.
-const METODOS_POR_PERSONA = {
-  jose: ['efectivo','transferencia','debito','credito'],
-  facu: ['efectivo','transferencia'],
-  agus: ['efectivo','transferencia'],
-};
-
-const sel = { fecha:'hoy', proyecto:'fagu_obra', quien:'jose', metodo:'efectivo', tarjeta:'Visa Francés BBVA', cuotas:1 };
-const filtro = { q:'', quien:'todos', proyecto:'todos' };
+const sel = { fecha:'hoy', metodo:'efectivo', tarjeta:'Visa', cuotas:1 };
+const filtro = { q:'', metodo:'todos' };
 
 // ---------- helpers ----------
 const $ = id => document.getElementById(id);
@@ -247,8 +229,6 @@ initChips('chips-fecha','fecha', v => {
   f.hidden = v !== 'otra';
   if(v === 'otra' && !f.value) f.value = hoyLocal();
 });
-initChips('chips-proyecto','proyecto');
-initChips('chips-quien','quien', aplicarReglaMetodos);
 initChips('chips-metodo','metodo', aplicarGruposTarjeta);
 initChips('chips-tarjeta','tarjeta', v => { $('tarjeta-otra').hidden = v !== '__otra'; });
 initChips('chips-cuotas','cuotas');
@@ -260,24 +240,7 @@ function aplicarGruposTarjeta(){
   if(!conTarjeta) $('tarjeta-otra').hidden = true;
   else $('tarjeta-otra').hidden = sel.tarjeta !== '__otra';
 }
-
-function aplicarReglaMetodos(){
-  const permitidos = METODOS_POR_PERSONA[sel.quien];
-  const box = $('chips-metodo');
-  box.querySelectorAll('.chip').forEach(c => {
-    const ok = permitidos.includes(c.dataset.v);
-    c.classList.toggle('off', !ok);
-    if(!ok && c.classList.contains('on')){
-      c.classList.remove('on');
-      sel.metodo = 'efectivo';
-      box.querySelector('[data-v="efectivo"]').classList.add('on');
-    }
-  });
-  aplicarGruposTarjeta();
-}
-aplicarReglaMetodos();
-
-// (Sin gastos recurrentes acá: eso es de las finanzas personales, no de obras.)
+aplicarGruposTarjeta();
 
 // ---------- foto ----------
 const fotoInput = $('foto-input');
@@ -303,7 +266,7 @@ async function comprimirFoto(file){
 
 async function subirFoto(file, fecha){
   const blob = await comprimirFoto(file);
-  const path = 'obras/' + fecha + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.jpg';
+  const path = 'agus/' + fecha + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.jpg';
   const r = await fetch(SUPABASE_URL + '/storage/v1/object/facturas/' + path, {
     method:'POST', headers:{...H, 'Content-Type':'image/jpeg'}, body: blob,
   });
@@ -317,45 +280,37 @@ montoEl.addEventListener('input', () => {
   montoEl.value = n ? Number(n).toLocaleString('es-AR') : '';
 });
 
-// ---------- persistencia local + POST con anti-duplicados ----------
+// ---------- persistencia local + POST resiliente ----------
 function leerLS(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)) || []; }catch(e){ return []; } }
 function escribirLS(a){ localStorage.setItem(LS_KEY, JSON.stringify(a)); }
 
-// Anti-duplicados: cada gasto viaja con un local_id único (índice UNIQUE en
-// la DB). Si el teléfono reintenta un envío que ya había llegado, la base
-// contesta 409 (duplicado) y se toma como "ya guardado" — no se duplica.
-// OJO: no se usa on_conflict/ignore-duplicates porque el RLS es insert-only
-// (sin SELECT para anon) y ese modo necesita leer la fila en conflicto.
-// Resiliencia de esquema: si a la DB le falta una columna nueva (p.ej.
-// `relevar` antes de correr SETUP-GASTOS-V6.sql), se reintenta sin ella.
-const OPCIONALES = {local_id:true, relevar:true};
+// Modo compatibilidad: si la tabla o la RPC todavía no existen en Supabase
+// (falta correr SETUP-GASTOS-V6.sql), la app no muestra errores feos:
+// guarda en el teléfono y reintenta sola hasta que la nube esté lista.
+// Anti-duplicados: local_id es UNIQUE en la DB; un reintento de un gasto
+// que ya llegó contesta 409 (duplicado) y se toma como "ya guardado".
+let nubeLista = true;
+const esNubeNoLista = (status, msg) =>
+  status === 404 || /PGRST20[25]|Could not find/i.test(msg);
 
 async function postSupabase(gasto){
-  for(let i = 0; i <= Object.keys(OPCIONALES).length; i++){
-    const body = {...gasto};
-    for(const c in OPCIONALES) if(!OPCIONALES[c]) delete body[c];
-    const r = await fetch(SUPABASE_URL + '/rest/v1/' + TABLA, {
-      method:'POST',
-      headers:{...H, 'Content-Type':'application/json', 'Prefer':'return=minimal'},
-      body: JSON.stringify(body),
-    });
-    if(r.ok) return true;
-    let msg = '';
-    try{ msg = await r.text(); }catch(e){}
-    if(r.status === 409 && /23505|duplicate/i.test(msg)) return true;   // ya estaba
-    let cambio = false;
-    for(const c in OPCIONALES){
-      if(OPCIONALES[c] && (c in body) && msg.includes(c)){ OPCIONALES[c] = false; cambio = true; }
-    }
-    if(!cambio) return false;   // error real, no de columnas
-  }
+  const r = await fetch(SUPABASE_URL + '/rest/v1/' + TABLA, {
+    method:'POST',
+    headers:{...H, 'Content-Type':'application/json', 'Prefer':'return=minimal'},
+    body: JSON.stringify(gasto),
+  });
+  if(r.ok){ nubeLista = true; return true; }
+  let msg = '';
+  try{ msg = await r.text(); }catch(e){}
+  if(r.status === 409 && /23505|duplicate/i.test(msg)) return true;   // ya estaba
+  if(esNubeNoLista(r.status, msg)) nubeLista = false;
   return false;
 }
 
 function refrescarPendientes(){
   const n = leerLS().filter(x => x.estado === 'pendiente').length;
   const el = $('pendientes');
-  el.textContent = n ? ('⚠ ' + n + ' en cola sin sincronizar — tocá para reintentar') : '';
+  el.textContent = n ? ('⏳ ' + n + ' en el teléfono — se suben solos (tocá para probar)') : '';
   el.classList.toggle('show', n > 0);
 }
 
@@ -368,6 +323,7 @@ async function reintentarPendientes(avisar){
   for(const item of hist){
     if(item.estado !== 'pendiente') continue;
     const {estado, ...gasto} = item;   // el local_id VIAJA con el gasto (dedup)
+    if(gasto.local_id != null) gasto.local_id = String(gasto.local_id);
     try{ if(await postSupabase(gasto)){ item.estado = 'ok'; enviados++; } }catch(e){}
   }
   if(enviados){ escribirLS(hist); filasCache = null; }
@@ -407,8 +363,6 @@ btn.addEventListener('click', async () => {
     fecha: fechaElegida(),
     monto: monto || 0,
     descripcion: $('descripcion').value.trim(),
-    proyecto: sel.proyecto,
-    quien: sel.quien,
     metodo: sel.metodo,
     tarjeta: tarjeta,
     cuotas: esCredito ? sel.cuotas : 1,
@@ -424,24 +378,26 @@ btn.addEventListener('click', async () => {
   let ok = false;
   try{ ok = await postSupabase(gasto); }catch(e){}
   if(ok){ item.estado = 'ok'; escribirLS(hist); }
-  filasCache = null;               // el historial se refresca con el gasto nuevo
+  filasCache = null;
 
   const fotoFallo = hayFoto && !foto_path;
   if(navigator.vibrate) navigator.vibrate(ok ? 30 : [60,60,60]);
   btn.classList.add('ok');
-  btn.textContent = ok ? '✓ Guardado' : '✓ Guardado acá';
-  if(!ok){
-    toast(navigator.onLine
-      ? 'No se pudo guardar en el servidor — quedó en cola y se reintenta solo'
-      : 'Sin conexión — quedó en cola, se envía al volver la señal', 'error');
-  } else if(fotoFallo){
+  btn.textContent = '✓ Guardado';
+  if(ok && fotoFallo){
     toast(monto
       ? 'Gasto guardado, pero la foto no subió'
       : 'Guardado sin foto ni monto — completalo a mano después', 'warn');
-  } else if(!monto){
+  } else if(ok && !monto){
     toast('✓ Guardado — Jarvis saca el monto de la factura', 'ok');
-  } else {
+  } else if(ok){
     toast('✓ Guardado — ya figura arriba del Historial', 'ok');
+  } else if(!nubeLista){
+    toast('✓ Guardado en el teléfono — se sube solo apenas esté lista la nube');
+  } else if(!navigator.onLine){
+    toast('Sin conexión — quedó en el teléfono, se envía al volver la señal');
+  } else {
+    toast('No llegó al servidor — quedó en el teléfono y se reintenta solo', 'error');
   }
   setTimeout(() => {
     btn.classList.remove('ok'); btn.disabled = false; btn.textContent = 'Guardar gasto';
@@ -459,11 +415,11 @@ $('exportar').addEventListener('click', () => {
   const blob = new Blob([data], {type:'application/json'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'gastos-obras-respaldo.json';
+  a.download = 'gastos-agus-respaldo.json';
   a.click();
 });
 
-// ---------- datos (RPC con clave + cache en memoria) ----------
+// ---------- datos ----------
 let filasCache = null;
 async function traerFilas(force){
   if(filasCache && !force) return filasCache;
@@ -473,10 +429,27 @@ async function traerFilas(force){
     headers:{...H, 'Content-Type':'application/json'},
     body: JSON.stringify({clave}),
   });
-  if(!r.ok) throw new Error('server');
+  if(!r.ok){
+    let msg = '';
+    try{ msg = await r.text(); }catch(e){}
+    if(esNubeNoLista(r.status, msg)){ nubeLista = false; filasCache = []; return filasCache; }
+    throw new Error('server');
+  }
+  nubeLista = true;
   const filas = await r.json();
   filasCache = Array.isArray(filas) ? filas : [];
   return filasCache;
+}
+
+// Historial y Resumen suman lo que todavía está en cola en el teléfono
+// (con dedup por local_id contra lo que ya llegó al servidor).
+function filasConPendientes(){
+  const base = filasCache || [];
+  const enServer = new Set(base.map(f => f.local_id).filter(Boolean));
+  const pend = leerLS()
+    .filter(x => x.estado === 'pendiente' && !enServer.has(x.local_id))
+    .map(x => ({...x, _pendiente:true, id: Infinity}));
+  return [...pend, ...base];
 }
 
 // ---------- vistas ----------
@@ -521,17 +494,13 @@ $('buscador').addEventListener('input', () => {
   clearTimeout(buscaTimer);
   buscaTimer = setTimeout(() => { filtro.q = $('buscador').value.trim().toLowerCase(); renderHistorial(); }, 180);
 });
-function initFiltro(id, campo){
-  $(id).addEventListener('click', e => {
-    const b = e.target.closest('.chip'); if(!b) return;
-    $(id).querySelectorAll('.chip').forEach(c => c.classList.remove('on'));
-    b.classList.add('on');
-    filtro[campo] = b.dataset.v;
-    renderHistorial();
-  });
-}
-initFiltro('filtro-quien','quien');
-initFiltro('filtro-proyecto','proyecto');
+$('filtro-metodo').addEventListener('click', e => {
+  const b = e.target.closest('.chip'); if(!b) return;
+  $('filtro-metodo').querySelectorAll('.chip').forEach(c => c.classList.remove('on'));
+  b.classList.add('on');
+  filtro.metodo = b.dataset.v;
+  renderHistorial();
+});
 
 async function abrirHistorial(force){
   const cont = $('hist-lista');
@@ -550,11 +519,9 @@ async function abrirHistorial(force){
 }
 
 function coincide(f){
-  if(filtro.quien !== 'todos' && f.quien !== filtro.quien) return false;
-  if(filtro.proyecto !== 'todos' && f.proyecto !== filtro.proyecto) return false;
+  if(filtro.metodo !== 'todos' && f.metodo !== filtro.metodo) return false;
   if(!filtro.q) return true;
-  const blob = [f.descripcion, f.tarjeta, NOMBRES[f.quien], PROYECTOS[f.proyecto],
-                METODO_TXT[f.metodo], String(f.monto)].join(' ').toLowerCase();
+  const blob = [f.descripcion, f.tarjeta, METODO_TXT[f.metodo], String(f.monto)].join(' ').toLowerCase();
   return blob.includes(filtro.q);
 }
 
@@ -568,25 +535,18 @@ function filaHTML(f){
   const thumb = f.foto_path
     ? '<button class="thumb" data-foto="' + esc(f.foto_path) + '" aria-label="Ver factura"><span>📷</span></button>' : '';
   const importe = (f.relevar && !Number(f.monto)) ? '$ —' : fmt$(Number(f.monto));
-  return '<div class="gasto gasto--' + (PROY_CLASE[f.proyecto] || 'obra') + (thumb ? ' gasto--conthumb' : '') + '">' +
-    '<div class="avatar avatar--' + esc(f.quien) + '">' + (INICIAL[f.quien] || '?') + '</div>' +
+  return '<div class="gasto gasto--sinavatar' + (thumb ? ' gasto--conthumb' : '') + '">' +
     '<div class="info"><div class="desc">' + esc(f.descripcion || '(sin detalle)') + '</div>' +
     '<div class="meta">' + badge + extra + rev + cola + '</div></div>' +
     thumb +
-    '<div class="importe"><div class="m money">' + importe + '</div>' +
-    '<div class="f">' + (NOMBRES[f.quien] || '') + '</div></div>' +
+    '<div class="importe"><div class="m money">' + importe + '</div></div>' +
   '</div>';
 }
 
 function renderHistorial(){
   const cont = $('hist-lista');
   if(!filasCache) return;
-  // Pendientes locales arriba (todavía no llegaron al server) — sin duplicar
-  const enServer = new Set(filasCache.map(f => f.local_id).filter(Boolean));
-  const pendientes = leerLS()
-    .filter(x => x.estado === 'pendiente' && !enServer.has(x.local_id))
-    .map(x => ({...x, _pendiente:true, id: Infinity}));
-  const todas = [...pendientes, ...filasCache]
+  const todas = filasConPendientes()
     .sort((a, b) => b.fecha.localeCompare(a.fecha) || (b.id || 0) - (a.id || 0));
   const filtradas = todas.filter(coincide);
 
@@ -596,9 +556,11 @@ function renderHistorial(){
     : '';
 
   if(!filtradas.length){
-    cont.innerHTML = filasCache.length || pendientes.length
+    cont.innerHTML = todas.length
       ? '<div class="vacio"><b>Nada con ese filtro</b>Probá con otra búsqueda.</div>'
-      : '<div class="vacio"><b>Sin datos</b>¿La clave está bien?</div>';
+      : (nubeLista
+          ? '<div class="vacio"><b>Sin datos</b>¿La clave está bien?</div>'
+          : '<div class="vacio"><b>Sin gastos todavía</b>Cargá el primero desde la pestaña Cargar.</div>');
     return;
   }
 
@@ -657,18 +619,21 @@ async function abrirResumen(force){
       return;
     }
   }
-  if(!filasCache.length){
-    cont.innerHTML = '<div class="vacio"><b>Sin datos</b>¿La clave está bien?</div>';
+  const todas = filasConPendientes();
+  if(!todas.length){
+    cont.innerHTML = nubeLista
+      ? '<div class="vacio"><b>Sin datos</b>¿La clave está bien?</div>'
+      : '<div class="vacio"><b>Sin gastos todavía</b>Cargá el primero desde la pestaña Cargar.</div>';
     $('cambiar-clave-r').hidden = false;
     return;
   }
-  renderResumen(filasCache);
+  renderResumen(todas);
   $('cambiar-clave-r').hidden = false;
   $('actualizado').textContent = 'Actualizado ' + new Date().toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'});
 }
 
 // Regla: TODA compra a crédito impacta los meses siguientes (aun en 1 cuota).
-// (Sin recurrentes en obras: los gastos fijos van en las finanzas personales.)
+// (Sin recurrentes en esta v1 — si hacen falta, se agregan después.)
 function proyectar(filas){
   const hoy = new Date();
   const meses = [];
@@ -681,7 +646,6 @@ function proyectar(filas){
     const [fy, fm] = f.fecha.split('-').map(Number);
     const base = idx(fy, fm - 1);
     const etiqueta = f.descripcion || '(sin detalle)';
-    const sub = (NOMBRES[f.quien] || f.quien) + ' · ' + (PROYECTOS[f.proyecto] || f.proyecto);
     const esCredito = f.metodo === 'credito';
     if(esCredito){
       const n = Math.max(1, Number(f.cuotas) || 1);
@@ -689,7 +653,7 @@ function proyectar(filas){
       for(let i = 1; i <= n; i++){
         const k = base + i;
         if(k >= 0 && k < meses.length)
-          meses[k].items.push({t: etiqueta, sub, cuota: i + '/' + n, v: cuota});
+          meses[k].items.push({t: etiqueta, sub: f.tarjeta || 'Crédito', cuota: i + '/' + n, v: cuota});
       }
     }
   }
@@ -705,7 +669,6 @@ function barPath(x, y, w, h, r){
          ' V' + (y + h) + ' Z';
 }
 
-// Gráfico SVG propio: gasto por mes, últimos 6 meses (una serie = un color)
 function chartMeses(filas, color){
   const hoy = new Date();
   const labs = [], vals = [];
@@ -735,85 +698,77 @@ function chartMeses(filas, color){
 }
 
 function renderResumen(filas){
-  const total = filas.reduce((s, f) => s + Number(f.monto), 0);
-  const porQuien = {jose:0, facu:0, agus:0};
-  const porProy = {};
-  const nProy = {};
-  for(const f of filas){
-    porQuien[f.quien] = (porQuien[f.quien] || 0) + Number(f.monto);
-    porProy[f.proyecto] = (porProy[f.proyecto] || 0) + Number(f.monto);
-    nProy[f.proyecto] = (nProy[f.proyecto] || 0) + 1;
-  }
-  const pct = q => total ? (porQuien[q] / total * 100) : 0;
+  const hoy = new Date();
+  const ym = hoy.getFullYear() + '-' + String(hoy.getMonth()+1).padStart(2,'0');
+  const delMes = filas.filter(f => f.fecha.startsWith(ym));
+  const totalMes = delMes.reduce((s, f) => s + Number(f.monto), 0);
+  const totalHist = filas.reduce((s, f) => s + Number(f.monto), 0);
 
-  // Últimos 30 días
+  const porMetodo = {};
+  const porTarjeta = {};
+  for(const f of delMes){
+    porMetodo[f.metodo] = (porMetodo[f.metodo] || 0) + Number(f.monto);
+    if(f.tarjeta) porTarjeta[f.tarjeta] = (porTarjeta[f.tarjeta] || 0) + Number(f.monto);
+  }
+
   const d30 = new Date(); d30.setDate(d30.getDate() - 30);
   const corte30 = isoLocal(d30);
   const ult30 = filas.filter(f => f.fecha >= corte30);
   const total30 = ult30.reduce((s, f) => s + Number(f.monto), 0);
 
-  // Comprometido a futuro (cuotas + fijos de los próximos meses)
   const meses = proyectar(filas).filter(m => m.items.length);
   const comprometido = meses.reduce((s, m) => s + m.items.reduce((x, i) => x + i.v, 0), 0);
 
-  // HERO: total + onda firma + apilada por hermano
+  // HERO: gastado este mes + onda firma
   let html =
     '<section class="hero">' +
-      '<div class="etiqueta">Total invertido</div>' +
-      '<div class="total money">' + fmt$(total) + '</div>' +
+      '<div class="etiqueta">Gastado este mes</div>' +
+      '<div class="total money">' + fmt$(totalMes) + '</div>' +
       '<svg class="onda" viewBox="0 0 220 14" aria-hidden="true">' +
         '<path d="M2 8 Q30 2 58 8 T114 8 T170 8 T226 8" fill="none" stroke="#C98F5F" stroke-width="1.6" stroke-linecap="round" opacity=".7"/>' +
       '</svg>' +
-      '<div class="sub">' + filas.length + ' gastos entre los tres</div>' +
-      '<div class="stacked" role="img" aria-label="' +
-        ['jose','facu','agus'].map(q => NOMBRES[q] + ' ' + Math.round(pct(q)) + '%').join(', ') + '">' +
-        ['jose','facu','agus'].filter(q => porQuien[q] > 0).map(q =>
-          '<i style="width:' + pct(q).toFixed(1) + '%; background:var(--p-' + q + ')"></i>').join('') +
-      '</div>' +
-      '<div class="leyenda">' +
-        ['jose','facu','agus'].map(q =>
-          '<span><i style="background:var(--p-' + q + ')"></i>' + NOMBRES[q] + ' <b>' + fmt$(porQuien[q] || 0) + '</b></span>').join('') +
-      '</div>' +
+      '<div class="sub">' + delMes.length + ' gasto' + (delMes.length === 1 ? '' : 's') +
+      ' · histórico ' + fmt$(totalHist) + '</div>' +
     '</section>';
 
-  // STATS: por proyecto + últimos 30 días + comprometido
-  html += '<div class="stat-grid">';
-  for(const p of ['fagu_obra','tafi']){
-    if(!porProy[p]) continue;
-    html += '<div class="stat-card stat-card--' + PROY_CLASE[p] + '">' +
-      '<div class="lbl">' + esc(PROYECTOS[p]) + '</div>' +
-      '<div class="val money">' + fmt$(porProy[p]) + '</div>' +
-      '<div class="sub">' + nProy[p] + ' gasto' + (nProy[p] === 1 ? '' : 's') + '</div>' +
-    '</div>';
-  }
-  html += '<div class="stat-card stat-card--pearl">' +
+  // STATS
+  html += '<div class="stat-grid">' +
+    '<div class="stat-card stat-card--pearl">' +
       '<div class="lbl">Últimos 30 días</div>' +
       '<div class="val money">' + fmt$(total30) + '</div>' +
       '<div class="sub">' + ult30.length + ' gasto' + (ult30.length === 1 ? '' : 's') + '</div>' +
-    '</div>';
-  html += '<div class="stat-card stat-card--copper">' +
+    '</div>' +
+    '<div class="stat-card stat-card--copper">' +
       '<div class="lbl">Comprometido</div>' +
       '<div class="val money">' + fmt$(comprometido) + '</div>' +
       '<div class="sub">cuotas que vienen</div>' +
-    '</div>';
-  html += '</div>';
+    '</div></div>';
 
-  // CUÁNTO PUSO CADA UNO
-  const maxQuien = Math.max(...Object.values(porQuien), 1);
-  html +=
-    '<section class="card"><h3>Cuánto puso cada uno</h3><div class="bars">' +
-    ['jose','facu','agus'].map(q =>
-      '<div class="bar-row bar-row--' + q + '">' +
-        '<span class="quien">' + NOMBRES[q] + '</span>' +
-        '<div class="bar-track"><div class="bar-fill" style="--w:' + ((porQuien[q] || 0) / maxQuien * 100).toFixed(1) + '%"></div></div>' +
-        '<span class="cuanto">' + fmt$(porQuien[q] || 0) + '</span>' +
-      '</div>').join('') +
-    '</div></section>';
+  // POR MÉTODO (mes actual)
+  const metodos = ['efectivo','transferencia','debito','credito'].filter(m => porMetodo[m]);
+  if(metodos.length){
+    const max = Math.max(...metodos.map(m => porMetodo[m]), 1);
+    html += '<section class="card"><h3>Este mes por método</h3><div class="bars bars--metodo">' +
+      metodos.map(m =>
+        '<div class="bar-row"><span class="quien">' + METODO_TXT[m] + '</span>' +
+        '<div class="bar-track"><div class="bar-fill" style="--w:' + (porMetodo[m] / max * 100).toFixed(1) + '%"></div></div>' +
+        '<span class="cuanto money">' + fmt$(porMetodo[m]) + '</span></div>').join('') +
+      '</div></section>';
+  }
 
-  // GASTO POR MES (SVG propio)
-  html += '<section class="card"><h3>Gasto por mes</h3>' + chartMeses(filas, '#C98F5F') + '</section>';
+  // POR TARJETA (mes actual)
+  const tarjetas = Object.keys(porTarjeta);
+  if(tarjetas.length){
+    html += '<section class="card"><h3>Este mes por tarjeta</h3>' +
+      tarjetas.sort((a, b) => porTarjeta[b] - porTarjeta[a]).map(t =>
+        '<div class="tj-row"><span>' + esc(t) + '</span><b class="money">' + fmt$(porTarjeta[t]) + '</b></div>').join('') +
+      '</section>';
+  }
 
-  // COMPROMISOS QUE VIENEN (proyección de cuotas + fijos)
+  // GASTO POR MES
+  html += '<section class="card"><h3>Gasto por mes</h3>' + chartMeses(filas, ACCENT) + '</section>';
+
+  // COMPROMISOS QUE VIENEN
   html += '<div class="seccion"><h2>Compromisos que vienen</h2></div>';
   if(meses.length){
     html += meses.map(mes => {

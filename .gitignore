@@ -1,3 +1,5 @@
 # Nada privado acá — el SQL con la clave de Jarvis vive en ~/Downloads/SETUP-GASTOS-SUPABASE.sql (fuera del repo)
 *.sql
 .DS_Store
+.claude/
+ENTREGA-NOCHE.md

@@ -1,7 +1,9 @@
-# Genera los íconos de ambas PWAs — marca Apex Sync "Deep Teal" v2:
+# Genera los íconos de las 4 PWAs — marca Apex Sync "Deep Teal" v2:
 # fondo degradé deep teal → abyss, vértice (triángulo trazo fino) + onda.
-#   raíz      = Obras     (triángulo pearl + onda copper)
-#   personal/ = Fin. José (triángulo copper + onda pearl)
+#   raíz            = Obras       (triángulo pearl + onda copper)
+#   personal/       = Fin. José   (triángulo copper + onda pearl)
+#   personal-agus/  = Gastos Agus (todo pearl — identidad --p-agus)
+#   personal-facu/  = Gastos Facu (triángulo pearl + onda teal --p-facu)
 import os, math
 from PIL import Image, ImageDraw
 
@@ -9,6 +11,7 @@ DEEP   = (20, 49, 58)     # #14313A
 ABYSS  = (15, 39, 46)     # #0F272E
 PEARL  = (232, 226, 213)  # #E8E2D5
 COPPER = (201, 143, 95)   # #C98F5F
+TEAL   = (79, 176, 200)   # #4FB0C8
 
 S = 4  # supersampling para bordes suaves
 
@@ -63,8 +66,10 @@ def icono(size, ruta, tri, wave):
     print(ruta, size)
 
 VARIANTES = {
-    '.':        (PEARL, COPPER),
-    'personal': (COPPER, PEARL),
+    '.':             (PEARL, COPPER),
+    'personal':      (COPPER, PEARL),
+    'personal-agus': (PEARL, PEARL),
+    'personal-facu': (PEARL, TEAL),
 }
 for carpeta, (tri, wave) in VARIANTES.items():
     os.makedirs(carpeta, exist_ok=True)

@@ -537,3 +537,15 @@ a.tab{ text-decoration:none; }
   transition:transform var(--t-fast), background var(--t-fast);
 }
 .icon-btn:active{ transform:scale(.96); background:var(--surface-2); }
+
+/* ---------- 21. CIRCUITO DE FACTURAS (v3) ---------- */
+/* Aviso bajo el monto cuando hay foto adjunta: se puede dejar vacío */
+.foto-hint{
+  margin:10px 2px 0; text-align:center;
+  font-size:var(--fs-label); color:var(--ink-dim); font-weight:600;
+}
+.foto-hint[hidden]{ display:none; }
+/* Fila marcada para que Jarvis complete el monto desde la factura */
+.badge--relevar{ background:rgba(232,226,213,.12); color:var(--pearl); }
+/* Fila sin avatar pero con miniatura de factura (apps personales) */
+.gasto--sinavatar.gasto--conthumb{ grid-template-columns:1fr auto auto; }

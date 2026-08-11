@@ -1,8 +1,9 @@
-// Service worker de la app personal — NETWORK-FIRST para HTML/CSS:
-// José ve siempre la última versión apenas hay señal; el cache queda
-// como respaldo offline. Scope: /gastos-apex/personal/ (no toca obras).
-const CACHE = 'gastos-jose-v5';
-const SHELL = ['.', 'index.html', 'apex-sync.css', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
+// Service worker de Gastos Agus — NETWORK-FIRST para HTML/CSS:
+// Agus ve siempre la última versión apenas hay señal; el cache queda
+// como respaldo offline. Scope: /gastos-apex/personal-agus/.
+// El CSS compartido (../apex-sync.css) también se cachea acá.
+const CACHE = 'gastos-agus-v1';
+const SHELL = ['.', 'index.html', '../apex-sync.css', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
@@ -11,7 +12,7 @@ self.addEventListener('install', e => {
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k.startsWith('gastos-jose-') && k !== CACHE).map(k => caches.delete(k))))
+      .then(keys => Promise.all(keys.filter(k => k.startsWith('gastos-agus-') && k !== CACHE).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });

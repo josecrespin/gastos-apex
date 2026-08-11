@@ -30,6 +30,7 @@
       <span class="signo">$</span>
       <input id="monto" class="monto money" type="text" inputmode="numeric" autocomplete="off" placeholder="0" aria-label="Monto">
     </div>
+    <p class="foto-hint" id="foto-hint" hidden>Con foto podés dejar el monto vacío: Jarvis lo saca de la factura</p>
   </div>
 
   <div class="grupo">
@@ -86,7 +87,21 @@
   </div>
 
   <div class="grupo">
-    <button id="recurrente" class="chip chip--toggle">🔁 Se repite todos los meses</button>
+    <button id="btn-foto" class="chip chip--toggle">📷 Foto de la factura</button>
+    <input id="foto-input" type="file" accept="image/*" hidden>
+    <button id="recurrente" class="chip chip--toggle" style="margin-top:10px">🔁 Gasto que se repite</button>
+  </div>
+
+  <div class="grupo" id="grupo-rec-meses" hidden>
+    <label>¿Cuántos meses?</label>
+    <div class="chips chips--compact" id="chips-rec-meses">
+      <button class="chip" data-v="2">2</button>
+      <button class="chip" data-v="3">3</button>
+      <button class="chip" data-v="6">6</button>
+      <button class="chip on" data-v="12">12</button>
+      <button class="chip" data-v="24">24</button>
+      <button class="chip" data-v="inf">Sin fin</button>
+    </div>
   </div>
 
   <button id="guardar" class="btn-primary">Guardar gasto</button>
@@ -153,6 +168,7 @@
   </button>
 </nav>
 
+<div class="overlay" id="foto-overlay"><img id="foto-grande" alt="factura"><span>tocá para cerrar</span></div>
 <div class="toast" id="toast" role="status"></div>
 
 <script>
@@ -167,7 +183,7 @@ const H = {'apikey': ANON_KEY, 'Authorization': 'Bearer ' + ANON_KEY};
 const METODO_TXT = {efectivo:'Efectivo', transferencia:'Transferencia', debito:'Débito', credito:'Crédito'};
 const CAT_TXT = {personal:'Personal', negocio:'Negocio'};
 
-const sel = { fecha:'hoy', categoria:'personal', metodo:'efectivo', tarjeta:'Visa Francés BBVA', cuotas:1, recurrente:false };
+const sel = { fecha:'hoy', categoria:'personal', metodo:'efectivo', tarjeta:'Visa Francés BBVA', cuotas:1, recurrente:false, recMeses:'12' };
 const filtro = { q:'', categoria:'todos', metodo:'todos' };
 
 // ---------- helpers ----------
@@ -240,11 +256,48 @@ function aplicarGruposTarjeta(){
 }
 aplicarGruposTarjeta();
 
+// Recurrente con horizonte: José elige CUÁNTOS meses se repite (2-24) o
+// "sin fin". Nada de "todos los meses" a ciegas — eso proyectaba de más.
 const recEl = $('recurrente');
-recEl.addEventListener('click', () => {
-  sel.recurrente = !sel.recurrente;
+function pintarRec(){
   recEl.classList.toggle('on', sel.recurrente);
+  recEl.textContent = !sel.recurrente ? '🔁 Gasto que se repite'
+    : (sel.recMeses === 'inf' ? '🔁 Se repite sin fin' : '🔁 Se repite ' + sel.recMeses + ' meses');
+  $('grupo-rec-meses').hidden = !sel.recurrente;
+}
+recEl.addEventListener('click', () => { sel.recurrente = !sel.recurrente; pintarRec(); });
+initChips('chips-rec-meses','recMeses', pintarRec);
+
+// ---------- foto ----------
+const fotoInput = $('foto-input');
+const btnFoto = $('btn-foto');
+btnFoto.addEventListener('click', () => fotoInput.click());
+fotoInput.addEventListener('change', () => {
+  const hay = fotoInput.files && fotoInput.files.length;
+  btnFoto.classList.toggle('on', !!hay);
+  btnFoto.textContent = hay ? '📷 ✓ Foto lista' : '📷 Foto de la factura';
+  $('foto-hint').hidden = !hay;
 });
+
+async function comprimirFoto(file){
+  const img = await createImageBitmap(file);
+  const max = 1600;
+  const escala = Math.min(1, max / Math.max(img.width, img.height));
+  const c = document.createElement('canvas');
+  c.width = Math.round(img.width * escala);
+  c.height = Math.round(img.height * escala);
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+  return new Promise(res => c.toBlob(res, 'image/jpeg', 0.8));
+}
+
+async function subirFoto(file, fecha){
+  const blob = await comprimirFoto(file);
+  const path = 'jose/' + fecha + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.jpg';
+  const r = await fetch(SUPABASE_URL + '/storage/v1/object/facturas/' + path, {
+    method:'POST', headers:{...H, 'Content-Type':'image/jpeg'}, body: blob,
+  });
+  return r.ok ? path : null;
+}
 
 // ---------- monto ----------
 const montoEl = $('monto');
@@ -257,38 +310,32 @@ montoEl.addEventListener('input', () => {
 function leerLS(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)) || []; }catch(e){ return []; } }
 function escribirLS(a){ localStorage.setItem(LS_KEY, JSON.stringify(a)); }
 
-// Resiliencia de esquema: si la DB todavía no tiene la columna `categoria`
-// (falta correr SETUP-GASTOS-V5.sql) o `local_id`, se reintenta sin esa
-// columna y la app sigue andando igual.
+// Resiliencia de esquema: si a la DB le falta alguna columna nueva
+// (p.ej. `recurrente_meses` o `relevar` antes de correr SETUP-GASTOS-V6.sql),
+// se reintenta sin esa columna y la app sigue andando igual.
 // Anti-duplicados: el local_id es UNIQUE en la DB; un reintento de un gasto
 // que ya llegó contesta 409 (duplicado) y se toma como "ya guardado".
 // No se usa on_conflict/ignore-duplicates: el RLS insert-only no lo permite.
-let localIdSoportado = true;
-let categoriaSoportada = true;
+const OPCIONALES = {local_id:true, categoria:true, recurrente_meses:true, relevar:true};
 
 async function postSupabase(gasto){
-  const intento = (conLocalId, conCategoria) => {
+  for(let i = 0; i <= Object.keys(OPCIONALES).length; i++){
     const body = {...gasto};
-    if(!conLocalId) delete body.local_id;
-    if(!conCategoria) delete body.categoria;
-    return fetch(SUPABASE_URL + '/rest/v1/' + TABLA, {
+    for(const c in OPCIONALES) if(!OPCIONALES[c]) delete body[c];
+    const r = await fetch(SUPABASE_URL + '/rest/v1/' + TABLA, {
       method:'POST',
       headers:{...H, 'Content-Type':'application/json', 'Prefer':'return=minimal'},
       body: JSON.stringify(body),
     });
-  };
-  for(let i = 0; i < 3; i++){
-    const usaLocal = localIdSoportado && !!gasto.local_id;
-    const usaCat = categoriaSoportada && gasto.categoria != null;
-    const r = await intento(usaLocal, usaCat);
     if(r.ok) return true;
     let msg = '';
     try{ msg = await r.text(); }catch(e){}
     if(r.status === 409 && /23505|duplicate/i.test(msg)) return true;   // ya estaba
-    if(usaCat && /categoria/i.test(msg)){ categoriaSoportada = false; continue; }
-    if(usaLocal && /local_id/i.test(msg)){ localIdSoportado = false; continue; }
-    if(usaCat || usaLocal){ categoriaSoportada = false; localIdSoportado = false; continue; }
-    return false;
+    let cambio = false;
+    for(const c in OPCIONALES){
+      if(OPCIONALES[c] && (c in body) && msg.includes(c)){ OPCIONALES[c] = false; cambio = true; }
+    }
+    if(!cambio) return false;   // error real, no de columnas
   }
   return false;
 }
@@ -326,7 +373,10 @@ setInterval(() => { if(leerLS().some(x => x.estado === 'pendiente')) reintentarP
 const btn = $('guardar');
 btn.addEventListener('click', async () => {
   const monto = Number(montoEl.value.replace(/\D/g,''));
-  if(!monto){ montoEl.focus(); return; }
+  const hayFoto = !!(fotoInput.files && fotoInput.files.length);
+  // Con foto, el monto puede ir vacío: queda marcado para que Jarvis
+  // lo saque de la factura (flag `relevar`).
+  if(!monto && !hayFoto){ montoEl.focus(); return; }
   const esCredito = sel.metodo === 'credito';
   const conTarjeta = esCredito || sel.metodo === 'debito';
   let tarjeta = null;
@@ -337,17 +387,25 @@ btn.addEventListener('click', async () => {
   }
   btn.disabled = true; btn.textContent = 'Guardando…';
 
+  let foto_path = null;
+  if(hayFoto){
+    try{ foto_path = await subirFoto(fotoInput.files[0], fechaElegida()); }catch(e){}
+  }
+
   const gasto = {
     fecha: fechaElegida(),
-    monto: monto,
+    monto: monto || 0,
     descripcion: $('descripcion').value.trim(),
     categoria: sel.categoria,
     metodo: sel.metodo,
     tarjeta: tarjeta,
     cuotas: esCredito ? sel.cuotas : 1,
     es_recurrente: sel.recurrente,
+    foto_path: foto_path,
     local_id: uuid(),
   };
+  if(sel.recurrente && sel.recMeses !== 'inf') gasto.recurrente_meses = Number(sel.recMeses);
+  if(!monto && hayFoto) gasto.relevar = true;
 
   const hist = leerLS();
   const item = {...gasto, estado:'pendiente'};
@@ -358,6 +416,7 @@ btn.addEventListener('click', async () => {
   if(ok){ item.estado = 'ok'; escribirLS(hist); }
   filasCache = null;
 
+  const fotoFallo = hayFoto && !foto_path;
   if(navigator.vibrate) navigator.vibrate(ok ? 30 : [60,60,60]);
   btn.classList.add('ok');
   btn.textContent = ok ? '✓ Guardado' : '✓ Guardado acá';
@@ -365,6 +424,12 @@ btn.addEventListener('click', async () => {
     toast(navigator.onLine
       ? 'No se pudo guardar en el servidor — quedó en cola y se reintenta solo'
       : 'Sin conexión — quedó en cola, se envía al volver la señal', 'error');
+  } else if(fotoFallo){
+    toast(monto
+      ? 'Gasto guardado, pero la foto no subió'
+      : 'Guardado sin foto ni monto — completalo a mano después', 'warn');
+  } else if(!monto){
+    toast('✓ Guardado — Jarvis saca el monto de la factura', 'ok');
   } else {
     toast('✓ Guardado — ya figura arriba del Historial', 'ok');
   }
@@ -375,7 +440,11 @@ btn.addEventListener('click', async () => {
     document.querySelectorAll('#chips-fecha .chip').forEach(c => c.classList.toggle('on', c.dataset.v === 'hoy'));
     sel.categoria = 'personal';
     document.querySelectorAll('#chips-categoria .chip').forEach(c => c.classList.toggle('on', c.dataset.v === 'personal'));
-    sel.recurrente = false; recEl.classList.remove('on');
+    sel.recurrente = false; sel.recMeses = '12';
+    document.querySelectorAll('#chips-rec-meses .chip').forEach(c => c.classList.toggle('on', c.dataset.v === '12'));
+    pintarRec();
+    fotoInput.value = ''; btnFoto.classList.remove('on'); btnFoto.textContent = '📷 Foto de la factura';
+    $('foto-hint').hidden = true;
   }, 1500);
   refrescarPendientes();
 });
@@ -499,13 +568,19 @@ function filaHTML(f, mapa){
     ? '<span class="badge badge--credito">Crédito ' + (Number(f.cuotas) || 1) + '×</span>'
     : '<span class="badge">' + (METODO_TXT[f.metodo] || esc(f.metodo)) + '</span>';
   const extra = f.tarjeta ? '<span class="extra">' + esc(f.tarjeta) + '</span>' : '';
-  const rec = f.es_recurrente ? '<span class="badge badge--recurrente">🔁 fijo</span>' : '';
+  const rec = f.es_recurrente
+    ? '<span class="badge badge--recurrente">🔁 ' + (Number(f.recurrente_meses) ? Number(f.recurrente_meses) + ' meses' : 'fijo') + '</span>' : '';
   const neg = cat === 'negocio' ? '<span class="badge badge--negocio">Negocio</span>' : '';
+  const rev = f.relevar ? '<span class="badge badge--relevar">🔎 Jarvis la está leyendo</span>' : '';
   const cola = f._pendiente ? '<span class="badge badge--cola">⏳ en cola</span>' : '';
-  return '<div class="gasto gasto--sinavatar gasto--' + cat + '">' +
+  const thumb = f.foto_path
+    ? '<button class="thumb" data-foto="' + esc(f.foto_path) + '" aria-label="Ver factura"><span>📷</span></button>' : '';
+  const importe = (f.relevar && !Number(f.monto)) ? '$ —' : fmt$(Number(f.monto));
+  return '<div class="gasto gasto--sinavatar gasto--' + cat + (thumb ? ' gasto--conthumb' : '') + '">' +
     '<div class="info"><div class="desc">' + esc(f.descripcion || '(sin detalle)') + '</div>' +
-    '<div class="meta">' + badge + extra + neg + rec + cola + '</div></div>' +
-    '<div class="importe"><div class="m money">' + fmt$(Number(f.monto)) + '</div>' +
+    '<div class="meta">' + badge + extra + neg + rec + rev + cola + '</div></div>' +
+    thumb +
+    '<div class="importe"><div class="m money">' + importe + '</div>' +
     '<div class="f">' + CAT_TXT[cat] + '</div></div>' +
   '</div>';
 }
@@ -546,7 +621,35 @@ function renderHistorial(){
     html += filaHTML(f, mapa);
   }
   cont.innerHTML = html;
+  cont.querySelectorAll('[data-foto]').forEach(el => {
+    cargarThumb(el);
+    el.addEventListener('click', () => verFoto(el.dataset.foto));
+  });
 }
+
+// Miniaturas: el bucket es privado → se bajan con la anon key y se cachean
+const thumbCache = new Map();
+async function bajarFoto(path){
+  if(thumbCache.has(path)) return thumbCache.get(path);
+  const r = await fetch(SUPABASE_URL + '/storage/v1/object/facturas/' + path, {headers: H});
+  if(!r.ok) throw new Error('foto');
+  const url = URL.createObjectURL(await r.blob());
+  thumbCache.set(path, url);
+  return url;
+}
+async function cargarThumb(el){
+  try{
+    const url = await bajarFoto(el.dataset.foto);
+    el.innerHTML = '<img src="' + url + '" alt="factura">';
+  }catch(e){}
+}
+async function verFoto(path){
+  try{
+    $('foto-grande').src = await bajarFoto(path);
+    $('foto-overlay').classList.add('show');
+  }catch(e){ toast('No se pudo abrir la foto', 'error'); }
+}
+$('foto-overlay').addEventListener('click', () => $('foto-overlay').classList.remove('show'));
 
 // ---------- RESUMEN ----------
 async function abrirResumen(force){
@@ -572,7 +675,9 @@ async function abrirResumen(force){
 }
 
 // Regla: TODA compra a crédito impacta los meses siguientes (aun en 1 cuota).
-// Recurrentes cada mes; crédito + recurrente: manda el crédito (sin doble conteo).
+// Recurrentes: respetan el horizonte que eligió José — N meses en total
+// (el gasto cargado cuenta como pago 1) o sin fin si no puso límite.
+// Crédito + recurrente: manda el crédito (sin doble conteo).
 function proyectar(filas){
   const hoy = new Date();
   const meses = [];
@@ -587,8 +692,13 @@ function proyectar(filas){
     const etiqueta = f.descripcion || '(sin detalle)';
     const esCredito = f.metodo === 'credito';
     if(f.es_recurrente && !esCredito){
-      for(let k = Math.max(0, base + 1); k < meses.length; k++)
-        meses[k].items.push({t: etiqueta, sub: METODO_TXT[f.metodo] || f.metodo, rec:true, v: Number(f.monto)});
+      const N = Number(f.recurrente_meses) || 0;   // 0 = sin fin
+      for(let k = Math.max(0, base + 1); k < meses.length; k++){
+        const nro = k - base + 1;                  // el gasto original fue el pago 1
+        if(N && nro > N) break;
+        meses[k].items.push({t: etiqueta, sub: METODO_TXT[f.metodo] || f.metodo,
+                             rec:true, cuota: N ? nro + '/' + N : null, v: Number(f.monto)});
+      }
     }
     if(esCredito){
       const n = Math.max(1, Number(f.cuotas) || 1);
