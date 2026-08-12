@@ -273,11 +273,16 @@ const fmtK = n => n >= 1e6 ? (n/1e6).toLocaleString('es-AR', {maximumFractionDig
 const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(36).slice(2));
 const num = v => Number(v) || 0;
 
-// Redondeo consistente: devuelve las partes ya en pesos enteros, ajustadas
-// para que sumen EXACTO el total redondeado que se muestra al lado.
-// Sin esto, dos centavos sueltos (una cuota de $3.284,52) hacen que las
-// partes den $1 mas que el total. Metodo del resto mayor: el peso que sobra
-// o falta se le da a la parte con la fraccion mas grande.
+// EL redondeo: cada gasto se redondea UNA sola vez, aca, al peso que se ve
+// en su fila. De ahi para arriba solo se suman enteros, asi cualquier total
+// es exactamente la suma de lo que se muestra. Sin esto, una factura de
+// $3.284,52 hacia que Jose + Facu diera $1 mas que el total de la obra.
+const montoEnt = f => Math.round(num(f.monto));
+
+// Para lo unico que sigue dando decimales: las cuotas (un gasto dividido en
+// N). Devuelve las partes en pesos enteros ajustadas para que sumen EXACTO
+// el total redondeado. Metodo del resto mayor: el peso que sobra o falta va
+// a la parte con la fraccion mas grande.
 function partesRedondeadas(total, partes){
   const objetivo = Math.round(num(total));
   const base = partes.map(v => Math.floor(num(v)));
@@ -750,7 +755,7 @@ function renderHistorial(){
   const filtradas = todas.filter(coincide);
 
   const nPend = todas.filter(f => f._pendiente).length;
-  const totalF = filtradas.reduce((s, f) => s + num(f.monto), 0);
+  const totalF = filtradas.reduce((s, f) => s + montoEnt(f), 0);
   $('hist-stats').textContent = filtradas.length
     ? filtradas.length + ' gasto' + (filtradas.length === 1 ? '' : 's') + ' · ' + fmt$(totalF) +
       (nPend ? ' · ⏳ ' + nPend + ' en cola' : '')
@@ -768,7 +773,7 @@ function renderHistorial(){
     if(f.fecha !== diaActual){
       diaActual = f.fecha;
       const delDia = filtradas.filter(x => x.fecha === f.fecha);
-      const totDia = delDia.reduce((s, x) => s + num(x.monto), 0);
+      const totDia = delDia.reduce((s, x) => s + montoEnt(x), 0);
       html += '<div class="dia-head"><span class="dia">' + esc(etiquetaDia(f.fecha)) + '</span>' +
               '<b class="money">' + fmt$(totDia) + '</b></div>';
     }
@@ -842,12 +847,12 @@ function proyectar(filas){
         const nro = k - base + 1;                 // el gasto original fue el pago 1
         if(N && nro > N) break;
         meses[k].items.push({t: etiqueta, sub: marca + (METODO_TXT[f.metodo] || f.metodo),
-                             rec:true, cuota: N ? nro + '/' + N : null, v: num(f.monto)});
+                             rec:true, cuota: N ? nro + '/' + N : null, v: montoEnt(f)});
       }
     }
     if(esCredito){
       const n = Math.max(1, num(f.cuotas) || 1);
-      const cuota = num(f.monto) / n;
+      const cuota = montoEnt(f) / n;
       for(let i = 1; i <= n; i++){
         const k = base + i;
         if(k >= 0 && k < meses.length)
@@ -876,8 +881,8 @@ function chartMeses(filasObra, filasPers){
     const d = new Date(hoy.getFullYear(), hoy.getMonth() - k, 1);
     const ym = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
     labs.push(d.toLocaleDateString('es-AR', {month:'short'}).replace('.',''));
-    vO.push(filasObra.filter(f => f.fecha.startsWith(ym)).reduce((s, f) => s + num(f.monto), 0));
-    vP.push(filasPers.filter(f => f.fecha.startsWith(ym)).reduce((s, f) => s + num(f.monto), 0));
+    vO.push(filasObra.filter(f => f.fecha.startsWith(ym)).reduce((s, f) => s + montoEnt(f), 0));
+    vP.push(filasPers.filter(f => f.fecha.startsWith(ym)).reduce((s, f) => s + montoEnt(f), 0));
   }
   const tot = vO.map((v, i) => v + vP[i]);
   const max = Math.max(...tot, 1);
@@ -922,15 +927,12 @@ function renderResumen(){
   const persMia   = [...(cachePersonal || []), ...pend.filter(f => f._src === 'personal')];
   const todasMias = [...obraMia, ...persMia];
 
-  const suma = a => a.reduce((s, f) => s + num(f.monto), 0);
+  const suma = a => a.reduce((s, f) => s + montoEnt(f), 0);
   const delMes = a => a.filter(f => f.fecha.startsWith(ym));
 
   const mesObra = suma(delMes(obraMia));
   const mesPers = suma(delMes(persMia));
-  const mesMio  = mesObra + mesPers;
-  // Obra + Personal tienen que dar exacto el total grande de arriba.
-  const [mesObraR, mesPersR] = partesRedondeadas(mesMio, [mesObra, mesPers]);
-  const mesMioR = Math.round(mesMio);
+  const mesMio  = mesObra + mesPers;   // suma de enteros: cierra sola
 
   const meses = proyectar(todasMias).filter(m => m.items.length);
 
@@ -938,13 +940,13 @@ function renderResumen(){
   let html = avisoParcial() +
     '<section class="hero">' +
       '<div class="etiqueta">Lo que gastaste este mes</div>' +
-      '<div class="total money">' + fmt$(mesMioR) + '</div>' +
+      '<div class="total money">' + fmt$(mesMio) + '</div>' +
       '<svg class="onda" viewBox="0 0 220 14" aria-hidden="true">' +
         '<path d="M2 8 Q30 2 58 8 T114 8 T170 8 T226 8" fill="none" stroke="#C98F5F" stroke-width="1.6" stroke-linecap="round" opacity=".7"/>' +
       '</svg>' +
       '<div class="leyenda">' +
-        '<span><i style="background:#C98F5F"></i>Obra <b>' + fmt$(mesObraR) + '</b></span>' +
-        '<span><i style="background:' + ACCENT + '"></i>Personal <b>' + fmt$(mesPersR) + '</b></span>' +
+        '<span><i style="background:#C98F5F"></i>Obra <b>' + fmt$(mesObra) + '</b></span>' +
+        '<span><i style="background:' + ACCENT + '"></i>Personal <b>' + fmt$(mesPers) + '</b></span>' +
       '</div>' +
     '</section>';
 
@@ -953,18 +955,14 @@ function renderResumen(){
   const porQuien = {jose:0, facu:0, agus:0};
   const porProy = {};
   for(const f of obraTodos){
-    porQuien[f.quien] = (porQuien[f.quien] || 0) + num(f.monto);
-    if(f.quien === YO) porProy[f.proyecto] = (porProy[f.proyecto] || 0) + num(f.monto);
+    porQuien[f.quien] = (porQuien[f.quien] || 0) + montoEnt(f);
+    if(f.quien === YO) porProy[f.proyecto] = (porProy[f.proyecto] || 0) + montoEnt(f);
   }
 
-  // Lo que puso cada hermano tiene que sumar EXACTO el total de la obra.
-  // A partir de aca se muestran solo estos valores ya redondeados.
-  const QUIENES = ['jose','facu','agus'];
-  const quienR = {};
-  partesRedondeadas(totalObraTodos, QUIENES.map(q => porQuien[q] || 0))
-    .forEach((v, i) => { quienR[QUIENES[i]] = v; });
-  const totalObraTodosR = Math.round(totalObraTodos);
-  const totalObraMiaR   = quienR[YO];   // asi el stat card y la barra dicen lo mismo
+  // porQuien sale de sumar enteros, asi que jose + facu + agus da exacto
+  // totalObraTodos. Y lo que puso YO es la misma cifra en el stat card que
+  // en su barra, porque es literalmente el mismo numero.
+  const totalObraMia = porQuien[YO] || 0;
 
   html += '<div class="bloque"><h2>🏗️ Obra FAGU</h2>' +
           '<span class="bl-sub">entre los tres</span></div>';
@@ -975,43 +973,39 @@ function renderResumen(){
     html += '<div class="stat-grid">' +
       '<div class="stat-card stat-card--mio">' +
         '<div class="lbl">Lo que pusiste vos</div>' +
-        '<div class="val money">' + fmt$(totalObraMiaR) + '</div>' +
+        '<div class="val money">' + fmt$(totalObraMia) + '</div>' +
         '<div class="sub">' + obraMia.length + ' gasto' + (obraMia.length === 1 ? '' : 's') + '</div>' +
       '</div>' +
       '<div class="stat-card stat-card--obra">' +
         '<div class="lbl">Total de la obra</div>' +
-        '<div class="val money">' + fmt$(totalObraTodosR) + '</div>' +
+        '<div class="val money">' + fmt$(totalObraTodos) + '</div>' +
         '<div class="sub">' + obraTodos.length + ' gastos entre los tres</div>' +
       '</div></div>';
 
     // Quién puso cuánto — apilada + barras
-    const pct = q => totalObraTodosR ? (quienR[q] / totalObraTodosR * 100) : 0;
-    const maxQ = Math.max(...Object.values(quienR), 1);
+    const pct = q => totalObraTodos ? (porQuien[q] / totalObraTodos * 100) : 0;
+    const maxQ = Math.max(...Object.values(porQuien), 1);
     html += '<section class="card"><h3>Cuánto puso cada uno</h3>' +
       '<div class="stacked" role="img" aria-label="' +
         ['jose','facu','agus'].map(q => NOMBRES[q] + ' ' + Math.round(pct(q)) + '%').join(', ') + '">' +
-        ['jose','facu','agus'].filter(q => quienR[q] > 0).map(q =>
+        ['jose','facu','agus'].filter(q => porQuien[q] > 0).map(q =>
           '<i style="width:' + pct(q).toFixed(1) + '%; background:var(--p-' + q + ')"></i>').join('') +
       '</div>' +
       '<div class="bars" style="margin-top:var(--sp-4)">' +
       ['jose','facu','agus'].map(q =>
         '<div class="bar-row bar-row--' + q + '">' +
           '<span class="quien">' + (q === YO ? 'Vos' : NOMBRES[q]) + '</span>' +
-          '<div class="bar-track"><div class="bar-fill" style="--w:' + ((quienR[q] || 0) / maxQ * 100).toFixed(1) + '%"></div></div>' +
-          '<span class="cuanto money">' + fmt$(quienR[q] || 0) + '</span>' +
+          '<div class="bar-track"><div class="bar-fill" style="--w:' + ((porQuien[q] || 0) / maxQ * 100).toFixed(1) + '%"></div></div>' +
+          '<span class="cuanto money">' + fmt$(porQuien[q] || 0) + '</span>' +
         '</div>').join('') +
       '</div></section>';
 
     // Si tocó las dos obras, cómo se repartió LO SUYO
     const proys = Object.keys(porProy).filter(p => porProy[p]);
     if(proys.length > 1){
-      // Las obras tienen que sumar exacto "Lo que pusiste vos" de arriba.
-      const proyR = {};
-      partesRedondeadas(totalObraMiaR, proys.map(p => porProy[p]))
-        .forEach((v, i) => { proyR[proys[i]] = v; });
       html += '<section class="card"><h3>Lo tuyo por obra</h3>' +
-        proys.sort((a, b) => proyR[b] - proyR[a]).map(p =>
-          '<div class="tj-row"><span>' + esc(PROYECTOS[p] || p) + '</span><b class="money">' + fmt$(proyR[p]) + '</b></div>').join('') +
+        proys.sort((a, b) => porProy[b] - porProy[a]).map(p =>
+          '<div class="tj-row"><span>' + esc(PROYECTOS[p] || p) + '</span><b class="money">' + fmt$(porProy[p]) + '</b></div>').join('') +
         '</section>';
     }
   }
@@ -1032,7 +1026,7 @@ function renderResumen(){
     html += '<div class="stat-grid">' +
       '<div class="stat-card stat-card--mio">' +
         '<div class="lbl">Este mes</div>' +
-        '<div class="val money">' + fmt$(mesPersR) + '</div>' +
+        '<div class="val money">' + fmt$(mesPers) + '</div>' +
         '<div class="sub">' + persMes.length + ' gasto' + (persMes.length === 1 ? '' : 's') + '</div>' +
       '</div>' +
       '<div class="stat-card stat-card--pearl">' +
@@ -1043,8 +1037,8 @@ function renderResumen(){
 
     const porMetodo = {}, porTarjeta = {};
     for(const f of persMes){
-      porMetodo[f.metodo] = (porMetodo[f.metodo] || 0) + num(f.monto);
-      if(f.tarjeta) porTarjeta[f.tarjeta] = (porTarjeta[f.tarjeta] || 0) + num(f.monto);
+      porMetodo[f.metodo] = (porMetodo[f.metodo] || 0) + montoEnt(f);
+      if(f.tarjeta) porTarjeta[f.tarjeta] = (porTarjeta[f.tarjeta] || 0) + montoEnt(f);
     }
     const metodos = ['efectivo','transferencia','debito','credito'].filter(m => porMetodo[m]);
     if(metodos.length){
@@ -1072,9 +1066,9 @@ function renderResumen(){
   // ===== COMPROMISOS QUE VIENEN =====
   html += '<div class="bloque"><h2>Compromisos que vienen</h2></div>';
   if(meses.length){
-    // Las cuotas caen en decimales (una compra de $3.284,52 en 3). Cada mes
-    // reparte su propio redondeo para que las filas den exacto el total del
-    // mes, y el comprometido es la suma de esos totales ya redondeados.
+    // Lo unico que todavia cae en decimales: dividir un gasto en cuotas
+    // ($100.000 en 3). Cada mes reparte su propio redondeo para que las filas
+    // den exacto el total del mes, y el comprometido suma esos totales.
     let comprometido = 0;
     html += meses.map(mes => {
       const t = mes.items.reduce((s, i) => s + i.v, 0);
