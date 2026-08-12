@@ -1,44 +1,12 @@
-// Service worker de Gastos Facu — NETWORK-FIRST para HTML/CSS:
-// Facu ve siempre la última versión apenas hay señal; el cache queda
-// como respaldo offline. Scope: /gastos-apex/personal-facu/.
-// El CSS compartido (../apex-sync.css) también se cachea acá.
-const CACHE = 'gastos-facu-v2';
-const SHELL = ['.', 'index.html', '../apex-sync.css', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
-
-self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
-});
-
+// Gastos Facu se mudo a /facu/. Este worker solo se despide:
+// borra sus caches, se desregistra y deja pasar todo a la red.
+self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k.startsWith('gastos-facu-') && k !== CACHE).map(k => caches.delete(k))))
-      .then(() => self.clients.claim())
-  );
-});
-
-self.addEventListener('fetch', e => {
-  if (e.request.method !== 'GET' || !e.request.url.startsWith(self.location.origin)) return;
-  const req = e.request;
-  const esVivo = req.mode === 'navigate' || req.destination === 'document' ||
-                 req.destination === 'style' || /\.(html|css)$/.test(new URL(req.url).pathname);
-  if (esVivo) {
-    // cache:'no-cache' revalida SIEMPRE contra el server (evita que el
-    // HTTP cache del navegador devuelva un HTML viejo "fresco").
-    e.respondWith(
-      fetch(req, {cache:'no-cache'}).then(r => {
-        const copia = r.clone();
-        caches.open(CACHE).then(c => c.put(req, copia));
-        return r;
-      }).catch(() => caches.match(req))
-    );
-  } else {
-    e.respondWith(
-      caches.match(req).then(hit => hit || fetch(req).then(r => {
-        const copia = r.clone();
-        caches.open(CACHE).then(c => c.put(req, copia));
-        return r;
-      }))
-    );
-  }
+  e.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(keys.filter(k => k.indexOf('gastos-facu') === 0).map(k => caches.delete(k)));
+    await self.registration.unregister();
+    const cs = await self.clients.matchAll({type:'window'});
+    cs.forEach(c => c.navigate(c.url));
+  })());
 });

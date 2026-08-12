@@ -1,0 +1,1077 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Gastos Facu · Apex Sync</title>
+<meta name="theme-color" content="#0F272E">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Gastos Facu">
+<link rel="stylesheet" href="../apex-sync.css">
+<style>
+/* ==== VARIANTE FACU — v5 "una sola app": obra + personal juntos.
+   La base viene de ../apex-sync.css (compartida, no se duplica). ==== */
+:root{
+  --accent:      #4FB0C8;
+  --accent-hi:   #6FC2D6;
+  --accent-deep: #3A8CA0;
+  --accent-soft: rgba(79,176,200,.15);
+  --on-accent:   #062229;
+  --glow-accent: 0 10px 28px -10px rgba(79,176,200,.40);
+  --c-mio: #4FB0C8;                 /* color de "lo personal" en esta app */
+}
+
+/* ---- Selector de destino (lo primero que se ve al cargar) ---- */
+.modo-sw{
+  display:grid; grid-template-columns:1fr 1fr; gap:10px;
+  margin:var(--sp-3) 0 0;
+}
+.modo-sw .chip{
+  min-height:56px; padding:8px 6px; font-size:15px; font-weight:800;
+  line-height:1.2; justify-content:center; text-align:center;
+}
+.modo-sw .chip--mio.on{ background:var(--c-mio); border-color:var(--c-mio); color:#062229; }
+.modo-nota{
+  margin:10px 2px 0; font-size:var(--fs-caption); font-weight:600;
+  color:var(--ink-faint); text-align:center; min-height:1em;
+}
+.modo-nota b{ color:var(--ink-dim); }
+
+/* Filete por fuente en el historial */
+.gasto{ --edge: var(--c-mio); }
+.gasto--obra{ --edge:var(--c-obra); }
+.gasto--tafi{ --edge:var(--c-tafi); }
+.gasto--mio{  --edge:var(--c-mio); }
+.badge--obra{ background:var(--c-obra-soft); color:var(--copper-hi); }
+.badge--tafi{ background:var(--c-tafi-soft); color:var(--c-tafi); }
+.badge--mio{  background:var(--accent-soft); color:var(--accent-hi); }
+.stat-card--mio{ --stat-c:var(--c-mio); }
+.bar-row--mio .bar-fill{ --bc:var(--c-mio); }
+
+/* Encabezado de bloque dentro del Resumen — misma familia que .seccion h2
+   pero en pearl, para que se lean como los dos grandes cortes del resumen. */
+.bloque{
+  display:flex; align-items:baseline; justify-content:space-between; gap:8px;
+  margin:var(--sp-6) 2px var(--sp-2);
+  padding-bottom:8px; border-bottom:1px solid var(--line);
+}
+.bloque h2{
+  margin:0; font-size:var(--fs-label); font-weight:800;
+  letter-spacing:.12em; text-transform:uppercase; color:var(--pearl);
+}
+.bloque .bl-sub{ font-size:var(--fs-caption); color:var(--ink-faint); font-weight:600; }
+.badge--relevar{ background:rgba(239,199,94,.14); color:var(--warn); }
+.toast--warn{ border-color:var(--warn); color:var(--warn); }
+.aviso{
+  margin:var(--sp-3) 0 0; padding:10px var(--sp-3);
+  background:rgba(239,199,94,.10); border:1px solid rgba(239,199,94,.28);
+  border-radius:var(--r-card); color:var(--warn);
+  font-size:var(--fs-caption); font-weight:600; text-align:center;
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <svg class="logo" viewBox="0 0 32 32" aria-hidden="true">
+    <path d="M16 4.5 L27.5 26 H4.5 Z" fill="none" stroke="#E8E2D5" stroke-width="1.6" stroke-linejoin="round"/>
+    <path d="M3 20.5 Q9.5 15.5 16 20.5 T29 20.5" fill="none" stroke="#4FB0C8" stroke-width="2.2" stroke-linecap="round"/>
+  </svg>
+  <h1><b>Gastos Facu</b> · Apex Sync</h1>
+  <span class="periodo" id="periodo"></span>
+</header>
+
+<!-- ============ CARGAR ============ -->
+<main id="vista-cargar">
+
+  <div class="grupo" style="margin-top:var(--sp-2)">
+    <label>¿De qué es este gasto?</label>
+    <div class="modo-sw" id="chips-modo">
+      <button class="chip chip--obra on" data-v="obra">🏗️ Obra FAGU</button>
+      <button class="chip chip--mio" data-v="personal">👤 Personal</button>
+    </div>
+    <p class="modo-nota" id="modo-nota"></p>
+  </div>
+
+  <div class="monto-wrap">
+    <div class="monto-box">
+      <span class="signo">$</span>
+      <input id="monto" class="monto money" type="text" inputmode="numeric" autocomplete="off" placeholder="0" aria-label="Monto">
+    </div>
+    <p class="foto-hint" id="foto-hint" hidden>Con foto podés dejar el monto vacío: Jarvis lo saca de la factura</p>
+  </div>
+
+  <div class="grupo">
+    <input id="descripcion" class="field" type="text" autocomplete="off" placeholder="¿En qué?">
+  </div>
+
+  <div class="grupo">
+    <label>Fecha</label>
+    <div class="chips" id="chips-fecha">
+      <button class="chip on" data-v="hoy">Hoy</button>
+      <button class="chip" data-v="ayer">Ayer</button>
+      <button class="chip" data-v="otra">Otra</button>
+    </div>
+    <input id="fecha" class="field" type="date" style="margin-top:10px" hidden>
+  </div>
+
+  <div class="grupo" id="grupo-proyecto">
+    <label>Obra</label>
+    <div class="chips" id="chips-proyecto">
+      <button class="chip chip--obra on" data-v="fagu_obra">Obra FAGU</button>
+      <button class="chip chip--tafi" data-v="tafi">Casa Tafí</button>
+    </div>
+  </div>
+
+  <div class="grupo">
+    <label>Método</label>
+    <div class="chips" id="chips-metodo">
+      <button class="chip on" data-v="efectivo">Efectivo</button>
+      <button class="chip" data-v="transferencia">Transf.</button>
+      <button class="chip" data-v="debito">Débito</button>
+      <button class="chip" data-v="credito">Crédito</button>
+    </div>
+  </div>
+
+  <div class="grupo" id="grupo-tarjeta" hidden>
+    <label>Tarjeta</label>
+    <div class="chips" id="chips-tarjeta">
+      <button class="chip on" data-v="Visa">Visa</button>
+      <button class="chip" data-v="Mastercard">Mastercard</button>
+      <button class="chip" data-v="__otra">Otra</button>
+    </div>
+    <input id="tarjeta-otra" class="field" type="text" placeholder="¿Qué tarjeta?" style="margin-top:10px" hidden>
+  </div>
+
+  <div class="grupo" id="grupo-cuotas" hidden>
+    <label>Cuotas</label>
+    <div class="chips chips--compact" id="chips-cuotas">
+      <button class="chip on" data-v="1">1</button>
+      <button class="chip" data-v="3">3</button>
+      <button class="chip" data-v="6">6</button>
+      <button class="chip" data-v="12">12</button>
+    </div>
+  </div>
+
+  <div class="grupo">
+    <button id="btn-foto" class="chip chip--toggle">📷 Foto de la factura</button>
+    <input id="foto-input" type="file" accept="image/*" hidden>
+    <button id="recurrente" class="chip chip--toggle" style="margin-top:10px">🔁 Gasto que se repite</button>
+  </div>
+
+  <div class="grupo" id="grupo-rec-meses" hidden>
+    <label>¿Cuántos meses?</label>
+    <div class="chips chips--compact" id="chips-rec-meses">
+      <button class="chip" data-v="2">2</button>
+      <button class="chip" data-v="3">3</button>
+      <button class="chip" data-v="6">6</button>
+      <button class="chip on" data-v="12">12</button>
+      <button class="chip" data-v="24">24</button>
+      <button class="chip" data-v="inf">Sin fin</button>
+    </div>
+  </div>
+
+  <button id="guardar" class="btn-primary">Guardar gasto</button>
+
+  <div style="text-align:center"><button class="pendientes" id="pendientes"></button></div>
+
+  <footer class="pie">
+    Se guarda al instante · lo ves en Historial sin clave ni nada
+    <br><button class="lnk" id="exportar">Exportar respaldo</button>
+  </footer>
+</main>
+
+<!-- ============ HISTORIAL ============ -->
+<main id="vista-historial" hidden>
+  <div class="seccion"><h2>Historial</h2><button class="accion" id="refrescar-hist">↻ Actualizar</button></div>
+  <div class="filtros" id="filtro-fuente">
+    <button class="chip on" data-v="todo">Todo</button>
+    <button class="chip chip--obra" data-v="obra">🏗️ Obra</button>
+    <button class="chip chip--mio" data-v="personal">👤 Personal</button>
+  </div>
+  <input id="buscador" class="field field--busca" type="search" autocomplete="off" placeholder="Buscar gasto, tarjeta, monto…">
+  <p class="hist-stats" id="hist-stats"></p>
+  <div id="hist-lista"></div>
+</main>
+
+<!-- ============ RESUMEN ============ -->
+<main id="vista-resumen" hidden>
+  <div class="seccion"><h2>Resumen</h2><button class="accion" id="refrescar-res">↻ Actualizar</button></div>
+  <div id="res-contenido"></div>
+  <p class="pie" id="actualizado"></p>
+</main>
+
+<!-- ============ TABBAR ============ -->
+<nav class="tabbar">
+  <button class="tab act" id="tab-cargar" aria-label="Cargar">
+    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4v14M4 11h14"/></svg>
+    Cargar
+  </button>
+  <button class="tab" id="tab-historial" aria-label="Historial">
+    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 5.5h14M4 11h14M4 16.5h9"/></svg>
+    Historial
+  </button>
+  <button class="tab" id="tab-resumen" aria-label="Resumen">
+    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4.5 18V9.5M11 18V4.5M17.5 18v-6"/></svg>
+    Resumen
+  </button>
+</nav>
+
+<div class="overlay" id="foto-overlay"><img id="foto-grande" alt="factura"><span>tocá para cerrar</span></div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+// ============================================================
+// GASTOS FACU · Apex Sync v5 — UNA SOLA APP
+// Obra FAGU  → public.gastos_obras (quien = 'facu')
+// Personal   → public.gastos_facu
+// SIN CLAVE: las claves de lectura viajan en el código y se mandan solas.
+// ============================================================
+const SUPABASE_URL = 'https://kfiywiqivibktzakclyv.supabase.co';
+const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtmaXl3aXFpdmlia3R6YWtjbHl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyMTA1MTgsImV4cCI6MjA5ODc4NjUxOH0.Z1DQW5ySGolzrjsqeesg824cpctqa04BOS2RSH4NTNo';
+const H = {'apikey': ANON_KEY, 'Authorization': 'Bearer ' + ANON_KEY};
+
+const YO      = 'facu';
+const NOMBRE  = 'Facu';
+const ACCENT  = '#4FB0C8';
+
+const TABLA_OBRAS    = 'gastos_obras';
+const RPC_OBRAS      = 'gastos_obras_lista';
+const CLAVE_OBRAS    = '66db2f50ca';
+const TABLA_PERSONAL = 'gastos_facu';
+const RPC_PERSONAL   = 'gastos_facu_lista';
+const CLAVE_PERSONAL = '56a2863905';
+
+// La cola local es la MISMA que traía la app vieja (mismo origen), así que
+// lo que haya quedado pendiente en el teléfono se sube igual. A los items
+// viejos les falta `dest` → eran todos personales.
+const LS_KEY   = 'gastos_facu_v1';
+const LS_MODO  = 'gastos_facu_modo';
+const LS_CLAVE_VIEJA = 'gastos_facu_clave';
+
+const NOMBRES     = {jose:'José', facu:'Facu', agus:'Agus'};
+const PROYECTOS   = {fagu_obra:'Obra FAGU', tafi:'Casa Tafí'};
+const PROY_CLASE  = {fagu_obra:'obra', tafi:'tafi'};
+const METODO_TXT  = {efectivo:'Efectivo', transferencia:'Transferencia', debito:'Débito', credito:'Crédito'};
+// Regla de negocio heredada de la app de Obras: en la obra los hermanos
+// pagan solo en efectivo o por transferencia. En lo personal, los 4 métodos.
+const METODOS_OBRA = ['efectivo','transferencia'];
+
+const sel = { modo:'obra', fecha:'hoy', proyecto:'fagu_obra', metodo:'efectivo',
+              tarjeta:'Visa', cuotas:1, recurrente:false, recMeses:'12' };
+const filtro = { q:'', fuente:'todo' };
+
+// ---------- helpers ----------
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt$ = n => '$ ' + Math.round(n).toLocaleString('es-AR');
+const fmtK = n => n >= 1e6 ? (n/1e6).toLocaleString('es-AR', {maximumFractionDigits:1}) + ' M'
+              : n >= 1e3 ? Math.round(n/1e3) + ' k' : String(Math.round(n));
+const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(36).slice(2));
+const num = v => Number(v) || 0;
+
+let toastTimer = null;
+function toast(msg, tipo){
+  const t = $('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (tipo ? ' toast--' + tipo : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3200);
+}
+
+function isoLocal(d){
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+const hoyLocal = () => isoLocal(new Date());
+function fechaElegida(){
+  if(sel.fecha === 'otra') return $('fecha').value || hoyLocal();
+  if(sel.fecha === 'ayer'){ const d = new Date(); d.setDate(d.getDate()-1); return isoLocal(d); }
+  return hoyLocal();
+}
+function etiquetaDia(fechaISO){
+  const d = new Date(); d.setDate(d.getDate()-1);
+  const ayer = isoLocal(d);
+  const [y, m, dd] = fechaISO.split('-').map(Number);
+  const txt = new Date(y, m-1, dd).toLocaleDateString('es-AR', {weekday:'short', day:'numeric', month:'short'}).replace(/\./g,'');
+  if(fechaISO === hoyLocal()) return 'Hoy · ' + txt;
+  if(fechaISO === ayer) return 'Ayer · ' + txt;
+  return txt;
+}
+
+const mesNombre = new Date().toLocaleDateString('es-AR', {month:'long'});
+$('periodo').textContent = mesNombre.charAt(0).toUpperCase() + mesNombre.slice(1);
+
+// Higiene: la clave vieja ya no se usa nunca más.
+try{ localStorage.removeItem(LS_CLAVE_VIEJA); }catch(e){}
+
+// ---------- chips del form ----------
+function initChips(id, campo, cb){
+  const box = $(id);
+  box.addEventListener('click', e => {
+    const b = e.target.closest('.chip'); if(!b || b.classList.contains('off')) return;
+    box.querySelectorAll('.chip').forEach(c => c.classList.remove('on'));
+    b.classList.add('on');
+    sel[campo] = campo === 'cuotas' ? parseInt(b.dataset.v, 10) : b.dataset.v;
+    if(cb) cb(b.dataset.v);
+  });
+}
+
+initChips('chips-modo','modo', v => { localStorage.setItem(LS_MODO, v); aplicarModo(); });
+initChips('chips-fecha','fecha', v => {
+  const f = $('fecha');
+  f.hidden = v !== 'otra';
+  if(v === 'otra' && !f.value) f.value = hoyLocal();
+});
+initChips('chips-proyecto','proyecto');
+initChips('chips-metodo','metodo', aplicarGruposTarjeta);
+initChips('chips-tarjeta','tarjeta', v => { $('tarjeta-otra').hidden = v !== '__otra'; });
+initChips('chips-cuotas','cuotas');
+
+// El destino manda: en la obra solo efectivo/transferencia; el detalle de
+// obra (qué obra) solo aparece cuando corresponde.
+function aplicarModo(){
+  const esObra = sel.modo === 'obra';
+  $('grupo-proyecto').hidden = !esObra;
+  $('descripcion').placeholder = esObra
+    ? '¿En qué? (ej: membrana, cemento, flete)'
+    : '¿En qué? (ej: nafta, super, salida)';
+  $('modo-nota').innerHTML = esObra
+    ? 'Va a la caja de la obra · <b>lo ven los tres hermanos</b>'
+    : 'Tus gastos · <b>solo los ves vos</b>';
+  document.querySelectorAll('#chips-metodo .chip').forEach(c => {
+    const bloqueado = esObra && !METODOS_OBRA.includes(c.dataset.v);
+    c.classList.toggle('off', bloqueado);
+  });
+  if(esObra && !METODOS_OBRA.includes(sel.metodo)){
+    sel.metodo = 'efectivo';
+    document.querySelectorAll('#chips-metodo .chip').forEach(c => c.classList.toggle('on', c.dataset.v === 'efectivo'));
+  }
+  aplicarGruposTarjeta();
+}
+
+function aplicarGruposTarjeta(){
+  const conTarjeta = sel.metodo === 'debito' || sel.metodo === 'credito';
+  $('grupo-tarjeta').hidden = !conTarjeta;
+  $('grupo-cuotas').hidden = sel.metodo !== 'credito';
+  if(!conTarjeta) $('tarjeta-otra').hidden = true;
+  else $('tarjeta-otra').hidden = sel.tarjeta !== '__otra';
+}
+
+// Arranca en el último destino usado (memoria del selector).
+(function restaurarModo(){
+  const guardado = localStorage.getItem(LS_MODO);
+  if(guardado === 'personal' || guardado === 'obra') sel.modo = guardado;
+  document.querySelectorAll('#chips-modo .chip').forEach(c => c.classList.toggle('on', c.dataset.v === sel.modo));
+  aplicarModo();
+})();
+
+// "se repite N meses" (2-24) o sin fin.
+// Crédito + recurrente: manda el crédito (las cuotas ya proyectan solas).
+const recEl = $('recurrente');
+function pintarRec(){
+  recEl.classList.toggle('on', sel.recurrente);
+  recEl.textContent = !sel.recurrente ? '🔁 Gasto que se repite'
+    : (sel.recMeses === 'inf' ? '🔁 Se repite sin fin' : '🔁 Se repite ' + sel.recMeses + ' meses');
+  $('grupo-rec-meses').hidden = !sel.recurrente;
+}
+recEl.addEventListener('click', () => { sel.recurrente = !sel.recurrente; pintarRec(); });
+initChips('chips-rec-meses','recMeses', pintarRec);
+
+// ---------- foto ----------
+const fotoInput = $('foto-input');
+const btnFoto = $('btn-foto');
+btnFoto.addEventListener('click', () => fotoInput.click());
+fotoInput.addEventListener('change', () => {
+  const hay = fotoInput.files && fotoInput.files.length;
+  btnFoto.classList.toggle('on', !!hay);
+  btnFoto.textContent = hay ? '📷 ✓ Foto lista' : '📷 Foto de la factura';
+  $('foto-hint').hidden = !hay;
+});
+
+async function comprimirFoto(file){
+  const img = await createImageBitmap(file);
+  const max = 1600;
+  const escala = Math.min(1, max / Math.max(img.width, img.height));
+  const c = document.createElement('canvas');
+  c.width = Math.round(img.width * escala);
+  c.height = Math.round(img.height * escala);
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+  return new Promise(res => c.toBlob(res, 'image/jpeg', 0.8));
+}
+
+async function subirFoto(file, fecha, carpeta){
+  const blob = await comprimirFoto(file);
+  const path = carpeta + '/' + fecha + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.jpg';
+  const r = await fetch(SUPABASE_URL + '/storage/v1/object/facturas/' + path, {
+    method:'POST', headers:{...H, 'Content-Type':'image/jpeg'}, body: blob,
+  });
+  return r.ok ? path : null;
+}
+
+// ---------- monto ----------
+const montoEl = $('monto');
+montoEl.addEventListener('input', () => {
+  const n = montoEl.value.replace(/\D/g,'');
+  montoEl.value = n ? Number(n).toLocaleString('es-AR') : '';
+});
+
+// ---------- persistencia local + POST resiliente ----------
+function leerLS(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)) || []; }catch(e){ return []; } }
+function escribirLS(a){ localStorage.setItem(LS_KEY, JSON.stringify(a)); }
+
+// Anti-duplicados: local_id es UNIQUE en la DB; un reintento de un gasto
+// que ya llegó contesta 409 (duplicado) y se toma como "ya guardado".
+let nubeLista = true;
+const esNubeNoLista = (status, msg) =>
+  status === 404 || /PGRST20[25]|Could not find/i.test(msg);
+
+// Resiliencia de esquema: si a la DB le falta una columna nueva se reintenta
+// sin ella — la marca queda solo local hasta que corra el SQL.
+const OPCIONALES = {recurrente_meses:true};
+
+// Un item de la cola sabe a qué tabla va: `dest` = 'obra' | 'personal'.
+// Los items viejos (app v4) no lo traen → eran personales.
+const destDe = it => (it && it.dest === 'obra') ? 'obra' : 'personal';
+const tablaDe = it => destDe(it) === 'obra' ? TABLA_OBRAS : TABLA_PERSONAL;
+
+async function postSupabase(item){
+  const tabla = tablaDe(item);
+  const {estado, dest, ...gasto} = item;
+  for(let i = 0; i <= Object.keys(OPCIONALES).length; i++){
+    const body = {...gasto};
+    for(const c in OPCIONALES) if(!OPCIONALES[c]) delete body[c];
+    const r = await fetch(SUPABASE_URL + '/rest/v1/' + tabla, {
+      method:'POST',
+      headers:{...H, 'Content-Type':'application/json', 'Prefer':'return=minimal'},
+      body: JSON.stringify(body),
+    });
+    if(r.ok){ nubeLista = true; return true; }
+    let msg = '';
+    try{ msg = await r.text(); }catch(e){}
+    if(r.status === 409 && /23505|duplicate/i.test(msg)) return true;   // ya estaba
+    let cambio = false;
+    for(const c in OPCIONALES){
+      if(OPCIONALES[c] && (c in body) && msg.includes(c)){ OPCIONALES[c] = false; cambio = true; }
+    }
+    if(cambio) continue;              // reintenta sin la columna que rebotó
+    if(esNubeNoLista(r.status, msg)) nubeLista = false;
+    return false;
+  }
+  return false;
+}
+
+function refrescarPendientes(){
+  const n = leerLS().filter(x => x.estado === 'pendiente').length;
+  const el = $('pendientes');
+  el.textContent = n ? ('⏳ ' + n + ' en el teléfono — se suben solos (tocá para probar)') : '';
+  el.classList.toggle('show', n > 0);
+}
+
+let reintentando = false;
+async function reintentarPendientes(avisar){
+  if(reintentando || !navigator.onLine) { refrescarPendientes(); return; }
+  reintentando = true;
+  const hist = leerLS();
+  let enviados = 0;
+  for(const item of hist){
+    if(item.estado !== 'pendiente') continue;
+    if(item.local_id != null) item.local_id = String(item.local_id);
+    try{ if(await postSupabase(item)){ item.estado = 'ok'; enviados++; } }catch(e){}
+  }
+  if(enviados){ escribirLS(hist); invalidarCache(); }
+  reintentando = false;
+  refrescarPendientes();
+  if(avisar && enviados) toast('✓ ' + enviados + ' gasto(s) sincronizado(s)', 'ok');
+}
+
+$('pendientes').addEventListener('click', () => reintentarPendientes(true));
+window.addEventListener('online', () => reintentarPendientes(true));
+setInterval(() => { if(leerLS().some(x => x.estado === 'pendiente')) reintentarPendientes(false); }, 60000);
+
+// ---------- guardar ----------
+const btn = $('guardar');
+btn.addEventListener('click', async () => {
+  const monto = Number(montoEl.value.replace(/\D/g,''));
+  const hayFoto = !!(fotoInput.files && fotoInput.files.length);
+  // Con foto, el monto puede ir vacío: queda marcado para que Jarvis
+  // lo saque de la factura (flag `relevar`).
+  if(!monto && !hayFoto){ montoEl.focus(); return; }
+  const esObra = sel.modo === 'obra';
+  const esCredito = sel.metodo === 'credito';
+  const conTarjeta = esCredito || sel.metodo === 'debito';
+  let tarjeta = null;
+  if(conTarjeta){
+    tarjeta = sel.tarjeta === '__otra'
+      ? ($('tarjeta-otra').value.trim() || 'Otra')
+      : sel.tarjeta;
+  }
+  btn.disabled = true; btn.textContent = 'Guardando…';
+
+  let foto_path = null;
+  if(hayFoto){
+    try{ foto_path = await subirFoto(fotoInput.files[0], fechaElegida(), esObra ? 'obras' : YO); }catch(e){}
+  }
+
+  const gasto = {
+    fecha: fechaElegida(),
+    monto: monto || 0,
+    descripcion: $('descripcion').value.trim(),
+    metodo: sel.metodo,
+    tarjeta: tarjeta,
+    cuotas: esCredito ? sel.cuotas : 1,
+    es_recurrente: sel.recurrente,
+    foto_path: foto_path,
+    local_id: uuid(),
+  };
+  if(esObra){ gasto.proyecto = sel.proyecto; gasto.quien = YO; }
+  if(sel.recurrente && sel.recMeses !== 'inf') gasto.recurrente_meses = Number(sel.recMeses);
+  if(!monto && hayFoto) gasto.relevar = true;
+
+  const hist = leerLS();
+  const item = {...gasto, dest: esObra ? 'obra' : 'personal', estado:'pendiente'};
+  hist.push(item); escribirLS(hist);
+
+  let ok = false;
+  try{ ok = await postSupabase(item); }catch(e){}
+  if(ok){ item.estado = 'ok'; escribirLS(hist); }
+  invalidarCache();
+
+  const fotoFallo = hayFoto && !foto_path;
+  if(navigator.vibrate) navigator.vibrate(ok ? 30 : [60,60,60]);
+  btn.classList.add('ok');
+  btn.textContent = '✓ Guardado';
+  const donde = esObra ? 'a la obra' : 'a lo tuyo';
+  if(ok && fotoFallo){
+    toast(monto
+      ? 'Gasto guardado, pero la foto no subió'
+      : 'Guardado sin foto ni monto — completalo a mano después', 'warn');
+  } else if(ok && !monto){
+    toast('✓ Guardado — Jarvis saca el monto de la factura', 'ok');
+  } else if(ok){
+    toast('✓ Guardado ' + donde + ' — ya figura arriba del Historial', 'ok');
+  } else if(!nubeLista){
+    toast('✓ Guardado en el teléfono — se sube solo apenas esté lista la nube');
+  } else if(!navigator.onLine){
+    toast('Sin conexión — quedó en el teléfono, se envía al volver la señal');
+  } else {
+    toast('No llegó al servidor — quedó en el teléfono y se reintenta solo', 'error');
+  }
+  setTimeout(() => {
+    btn.classList.remove('ok'); btn.disabled = false; btn.textContent = 'Guardar gasto';
+    montoEl.value = ''; $('descripcion').value = '';
+    sel.fecha = 'hoy'; $('fecha').hidden = true; $('fecha').value = '';
+    document.querySelectorAll('#chips-fecha .chip').forEach(c => c.classList.toggle('on', c.dataset.v === 'hoy'));
+    sel.recurrente = false; sel.recMeses = '12';
+    document.querySelectorAll('#chips-rec-meses .chip').forEach(c => c.classList.toggle('on', c.dataset.v === '12'));
+    pintarRec();
+    fotoInput.value = ''; btnFoto.classList.remove('on'); btnFoto.textContent = '📷 Foto de la factura';
+    $('foto-hint').hidden = true;
+  }, 1500);
+  refrescarPendientes();
+});
+
+$('exportar').addEventListener('click', () => {
+  const data = JSON.stringify(leerLS(), null, 2);
+  const blob = new Blob([data], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'gastos-facu-respaldo.json';
+  a.click();
+});
+
+// ---------- datos: las DOS fuentes, sin pedir nada ----------
+let cacheObras = null;      // TODAS las filas de la obra (los tres hermanos)
+let cachePersonal = null;   // solo las mías
+let ultimoFallo = '';
+
+function invalidarCache(){ cacheObras = null; cachePersonal = null; }
+
+async function rpcLista(rpc, clave){
+  const r = await fetch(SUPABASE_URL + '/rest/v1/rpc/' + rpc, {
+    method:'POST',
+    headers:{...H, 'Content-Type':'application/json'},
+    body: JSON.stringify({clave}),
+  });
+  if(!r.ok){
+    let msg = '';
+    try{ msg = await r.text(); }catch(e){}
+    if(esNubeNoLista(r.status, msg)){ nubeLista = false; return []; }
+    throw new Error('server');
+  }
+  nubeLista = true;
+  const filas = await r.json();
+  return Array.isArray(filas) ? filas : [];
+}
+
+// Las dos fuentes en paralelo. Si una falla, la app igual muestra la otra.
+async function traerTodo(force){
+  if(cacheObras && cachePersonal && !force) return;
+  const [o, p] = await Promise.allSettled([
+    rpcLista(RPC_OBRAS, CLAVE_OBRAS),
+    rpcLista(RPC_PERSONAL, CLAVE_PERSONAL),
+  ]);
+  ultimoFallo = '';
+  if(o.status === 'fulfilled') cacheObras = o.value.map(f => ({...f, _src:'obra'}));
+  else { cacheObras = cacheObras || []; ultimoFallo = 'obra'; }
+  if(p.status === 'fulfilled') cachePersonal = p.value.map(f => ({...f, _src:'personal'}));
+  else { cachePersonal = cachePersonal || []; ultimoFallo = ultimoFallo ? 'ambas' : 'personal'; }
+  if(o.status === 'rejected' && p.status === 'rejected') throw new Error('server');
+}
+
+// Lo que todavía está en cola en el teléfono, sin duplicar lo que ya llegó.
+function pendientes(){
+  const enServer = new Set([...(cacheObras||[]), ...(cachePersonal||[])].map(f => f.local_id).filter(Boolean));
+  return leerLS()
+    .filter(x => x.estado === 'pendiente' && !enServer.has(x.local_id))
+    .map(x => ({...x, _src: destDe(x), _pendiente:true, id: Infinity}));
+}
+
+// Mis filas de obra (las que cargué yo) + mis personales + la cola.
+const misObras     = () => (cacheObras || []).filter(f => f.quien === YO);
+const misPersonales= () => (cachePersonal || []);
+function mias(){
+  return [...pendientes(), ...misObras(), ...misPersonales()];
+}
+
+// ---------- vistas ----------
+function setVista(v){
+  ['cargar','historial','resumen'].forEach(x => { $('vista-' + x).hidden = x !== v; });
+  $('tab-cargar').classList.toggle('act', v === 'cargar');
+  $('tab-historial').classList.toggle('act', v === 'historial');
+  $('tab-resumen').classList.toggle('act', v === 'resumen');
+  if(v === 'historial') abrirHistorial();
+  if(v === 'resumen') abrirResumen();
+}
+$('tab-cargar').addEventListener('click', () => setVista('cargar'));
+$('tab-historial').addEventListener('click', () => setVista('historial'));
+$('tab-resumen').addEventListener('click', () => setVista('resumen'));
+$('refrescar-hist').addEventListener('click', () => abrirHistorial(true));
+$('refrescar-res').addEventListener('click', () => abrirResumen(true));
+
+const htmlError = () =>
+  '<div class="vacio"><b>' + (navigator.onLine ? 'Error del servidor' : 'Sin conexión') +
+  '</b>Tocá ↻ Actualizar para probar de nuevo.</div>';
+
+function avisoParcial(){
+  if(!ultimoFallo) return '';
+  const que = ultimoFallo === 'obra' ? 'los gastos de la obra'
+            : ultimoFallo === 'personal' ? 'tus gastos personales' : 'los datos';
+  return '<p class="aviso">No se pudieron traer ' + que + '. Tocá ↻ Actualizar.</p>';
+}
+
+// ---------- HISTORIAL ----------
+let buscaTimer = null;
+$('buscador').addEventListener('input', () => {
+  clearTimeout(buscaTimer);
+  buscaTimer = setTimeout(() => { filtro.q = $('buscador').value.trim().toLowerCase(); renderHistorial(); }, 180);
+});
+$('filtro-fuente').addEventListener('click', e => {
+  const b = e.target.closest('.chip'); if(!b) return;
+  $('filtro-fuente').querySelectorAll('.chip').forEach(c => c.classList.remove('on'));
+  b.classList.add('on');
+  filtro.fuente = b.dataset.v;
+  renderHistorial();
+});
+
+async function abrirHistorial(force){
+  const cont = $('hist-lista');
+  if(!cacheObras || !cachePersonal || force){
+    cont.innerHTML = '<div class="vacio">Cargando…</div>';
+    $('hist-stats').textContent = '';
+    try{ await traerTodo(true); }
+    catch(e){ cont.innerHTML = htmlError(); return; }
+  }
+  renderHistorial();
+}
+
+function coincide(f){
+  if(filtro.fuente !== 'todo' && f._src !== filtro.fuente) return false;
+  if(!filtro.q) return true;
+  const blob = [f.descripcion, f.tarjeta, METODO_TXT[f.metodo], PROYECTOS[f.proyecto],
+                f._src === 'obra' ? 'obra' : 'personal', String(f.monto)].join(' ').toLowerCase();
+  return blob.includes(filtro.q);
+}
+
+function chipFuente(f){
+  if(f._src === 'obra'){
+    const cls = PROY_CLASE[f.proyecto] || 'obra';
+    return '<span class="badge badge--' + cls + '">🏗️ ' + esc(PROYECTOS[f.proyecto] || 'Obra') + '</span>';
+  }
+  return '<span class="badge badge--mio">👤 Personal</span>';
+}
+
+function filaHTML(f){
+  const metodo = f.metodo === 'credito'
+    ? '<span class="badge badge--credito">Crédito ' + (num(f.cuotas) || 1) + '×</span>'
+    : '<span class="badge">' + (METODO_TXT[f.metodo] || esc(f.metodo)) + '</span>';
+  const extra = f.tarjeta ? '<span class="extra">' + esc(f.tarjeta) + '</span>' : '';
+  const rec = f.es_recurrente
+    ? '<span class="badge badge--recurrente">🔁 ' + (num(f.recurrente_meses) ? num(f.recurrente_meses) + ' meses' : 'fijo') + '</span>' : '';
+  const rev = f.relevar ? '<span class="badge badge--relevar">🔎 Jarvis la está leyendo</span>' : '';
+  const cola = f._pendiente ? '<span class="badge badge--cola">⏳ en cola</span>' : '';
+  const thumb = f.foto_path
+    ? '<button class="thumb" data-foto="' + esc(f.foto_path) + '" aria-label="Ver factura"><span>📷</span></button>' : '';
+  const importe = (f.relevar && !num(f.monto)) ? '$ —' : fmt$(num(f.monto));
+  const clase = f._src === 'obra' ? (PROY_CLASE[f.proyecto] || 'obra') : 'mio';
+  return '<div class="gasto gasto--sinavatar gasto--' + clase + (thumb ? ' gasto--conthumb' : '') + '">' +
+    '<div class="info"><div class="desc">' + esc(f.descripcion || '(sin detalle)') + '</div>' +
+    '<div class="meta">' + chipFuente(f) + metodo + extra + rec + rev + cola + '</div></div>' +
+    thumb +
+    '<div class="importe"><div class="m money">' + importe + '</div></div>' +
+  '</div>';
+}
+
+function renderHistorial(){
+  const cont = $('hist-lista');
+  if(!cacheObras && !cachePersonal) return;
+  // Los pendientes primero (id = Infinity los deja arriba del día).
+  const todas = mias().sort((a, b) => b.fecha.localeCompare(a.fecha) || num(b.id) - num(a.id));
+  const filtradas = todas.filter(coincide);
+
+  const nPend = todas.filter(f => f._pendiente).length;
+  const totalF = filtradas.reduce((s, f) => s + num(f.monto), 0);
+  $('hist-stats').textContent = filtradas.length
+    ? filtradas.length + ' gasto' + (filtradas.length === 1 ? '' : 's') + ' · ' + fmt$(totalF) +
+      (nPend ? ' · ⏳ ' + nPend + ' en cola' : '')
+    : '';
+
+  if(!filtradas.length){
+    cont.innerHTML = avisoParcial() + (todas.length
+      ? '<div class="vacio"><b>Nada con ese filtro</b>Probá con otra búsqueda.</div>'
+      : '<div class="vacio"><b>Sin gastos todavía</b>Cargá el primero desde la pestaña Cargar.</div>');
+    return;
+  }
+
+  let html = avisoParcial(), diaActual = null;
+  for(const f of filtradas){
+    if(f.fecha !== diaActual){
+      diaActual = f.fecha;
+      const delDia = filtradas.filter(x => x.fecha === f.fecha);
+      const totDia = delDia.reduce((s, x) => s + num(x.monto), 0);
+      html += '<div class="dia-head"><span class="dia">' + esc(etiquetaDia(f.fecha)) + '</span>' +
+              '<b class="money">' + fmt$(totDia) + '</b></div>';
+    }
+    html += filaHTML(f);
+  }
+  cont.innerHTML = html;
+  cont.querySelectorAll('[data-foto]').forEach(el => {
+    cargarThumb(el);
+    el.addEventListener('click', () => verFoto(el.dataset.foto));
+  });
+}
+
+// Miniaturas: el bucket es privado → se bajan con la anon key y se cachean
+const thumbCache = new Map();
+async function bajarFoto(path){
+  if(thumbCache.has(path)) return thumbCache.get(path);
+  const r = await fetch(SUPABASE_URL + '/storage/v1/object/facturas/' + path, {headers: H});
+  if(!r.ok) throw new Error('foto');
+  const url = URL.createObjectURL(await r.blob());
+  thumbCache.set(path, url);
+  return url;
+}
+async function cargarThumb(el){
+  try{
+    const url = await bajarFoto(el.dataset.foto);
+    el.innerHTML = '<img src="' + url + '" alt="factura">';
+  }catch(e){}
+}
+async function verFoto(path){
+  try{
+    $('foto-grande').src = await bajarFoto(path);
+    $('foto-overlay').classList.add('show');
+  }catch(e){ toast('No se pudo abrir la foto', 'error'); }
+}
+$('foto-overlay').addEventListener('click', () => $('foto-overlay').classList.remove('show'));
+
+// ---------- RESUMEN ----------
+async function abrirResumen(force){
+  const cont = $('res-contenido');
+  $('actualizado').textContent = '';
+  if(!cacheObras || !cachePersonal || force){
+    cont.innerHTML = '<div class="vacio">Cargando…</div>';
+    try{ await traerTodo(true); }
+    catch(e){ cont.innerHTML = htmlError(); return; }
+  }
+  renderResumen();
+  $('actualizado').textContent = 'Actualizado ' + new Date().toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'});
+}
+
+// Regla: TODA compra a crédito impacta los meses siguientes (aun en 1 cuota).
+// Recurrentes: respetan el horizonte elegido — N meses en total (el gasto
+// cargado cuenta como pago 1) o sin fin si no se puso límite.
+// Crédito + recurrente: manda el crédito (sin doble conteo).
+function proyectar(filas){
+  const hoy = new Date();
+  const meses = [];
+  for(let k = 0; k < 6; k++){
+    const d = new Date(hoy.getFullYear(), hoy.getMonth() + k, 1);
+    meses.push({y: d.getFullYear(), m: d.getMonth(), items: []});
+  }
+  const idx = (y, m) => (y - meses[0].y) * 12 + (m - meses[0].m);
+  for(const f of filas){
+    const [fy, fm] = f.fecha.split('-').map(Number);
+    const base = idx(fy, fm - 1);
+    const etiqueta = f.descripcion || '(sin detalle)';
+    const marca = f._src === 'obra' ? '🏗️ ' : '👤 ';
+    const esCredito = f.metodo === 'credito';
+    if(f.es_recurrente && !esCredito){
+      const N = num(f.recurrente_meses);          // 0 = sin fin
+      for(let k = Math.max(0, base + 1); k < meses.length; k++){
+        const nro = k - base + 1;                 // el gasto original fue el pago 1
+        if(N && nro > N) break;
+        meses[k].items.push({t: etiqueta, sub: marca + (METODO_TXT[f.metodo] || f.metodo),
+                             rec:true, cuota: N ? nro + '/' + N : null, v: num(f.monto)});
+      }
+    }
+    if(esCredito){
+      const n = Math.max(1, num(f.cuotas) || 1);
+      const cuota = num(f.monto) / n;
+      for(let i = 1; i <= n; i++){
+        const k = base + i;
+        if(k >= 0 && k < meses.length)
+          meses[k].items.push({t: etiqueta, sub: marca + (f.tarjeta || 'Crédito'), cuota: i + '/' + n, v: cuota});
+      }
+    }
+  }
+  return meses;
+}
+
+function barPath(x, y, w, h, r){
+  r = Math.min(r, h);
+  return 'M' + x + ' ' + (y + h) + ' V' + (y + r) +
+         ' Q' + x + ' ' + y + ' ' + (x + r) + ' ' + y +
+         ' H' + (x + w - r) +
+         ' Q' + (x + w) + ' ' + y + ' ' + (x + w) + ' ' + (y + r) +
+         ' V' + (y + h) + ' Z';
+}
+
+// Barras apiladas: abajo la obra (cobre), arriba lo personal (acento).
+// Solo el segmento de más arriba lleva las esquinas redondeadas.
+function chartMeses(filasObra, filasPers){
+  const hoy = new Date();
+  const labs = [], vO = [], vP = [];
+  for(let k = 5; k >= 0; k--){
+    const d = new Date(hoy.getFullYear(), hoy.getMonth() - k, 1);
+    const ym = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    labs.push(d.toLocaleDateString('es-AR', {month:'short'}).replace('.',''));
+    vO.push(filasObra.filter(f => f.fecha.startsWith(ym)).reduce((s, f) => s + num(f.monto), 0));
+    vP.push(filasPers.filter(f => f.fecha.startsWith(ym)).reduce((s, f) => s + num(f.monto), 0));
+  }
+  const tot = vO.map((v, i) => v + vP[i]);
+  const max = Math.max(...tot, 1);
+  const base = 124, top = 26, bw = 34;
+  const gap = (320 - 6 * bw) / 7;
+  const alto = v => v > 0 ? Math.max(v / max * (base - top), 2) : 0;
+
+  let s = '<svg class="grafico" viewBox="0 0 320 150" role="img" aria-label="Gasto por mes: ' +
+    labs.map((l, i) => l + ' ' + fmt$(tot[i])).join(', ') + '">';
+  s += '<line x1="0" y1="' + (base + .5) + '" x2="320" y2="' + (base + .5) + '" stroke="rgba(232,226,213,.18)" stroke-width="1"/>';
+  tot.forEach((v, i) => {
+    const x = gap + (bw + gap) * i;
+    const cur = i === 5;
+    const op = cur ? '' : ' opacity=".55"';
+    const hO = alto(vO[i]), hP = alto(vP[i]);
+    const yTot = base - (hO + hP);
+    if(hP > 0){
+      s += '<path d="' + barPath(x, yTot, bw, hP, 4) + '" fill="' + ACCENT + '"' + op + '/>';
+      if(hO > 0) s += '<rect x="' + x + '" y="' + (yTot + hP) + '" width="' + bw + '" height="' + hO + '" fill="#C98F5F"' + op + '/>';
+    } else if(hO > 0){
+      s += '<path d="' + barPath(x, yTot, bw, hO, 4) + '" fill="#C98F5F"' + op + '/>';
+    } else {
+      s += '<rect x="' + x + '" y="' + (base - 2) + '" width="' + bw + '" height="2" fill="rgba(232,226,213,.18)"/>';
+    }
+    s += '<text x="' + (x + bw/2) + '" y="' + (base - Math.max(hO + hP, 2) - 6) + '" class="g-val' + (cur ? ' g-val--cur' : '') + '" text-anchor="middle">' + (v ? fmtK(v) : '—') + '</text>';
+    s += '<text x="' + (x + bw/2) + '" y="142" class="g-lab" text-anchor="middle">' + esc(labs[i]) + '</text>';
+  });
+  s += '</svg>';
+  s += '<div class="leyenda">' +
+       '<span><i style="background:#C98F5F"></i>Obra</span>' +
+       '<span><i style="background:' + ACCENT + '"></i>Personal</span></div>';
+  return s;
+}
+
+function renderResumen(){
+  const hoy = new Date();
+  const ym = hoy.getFullYear() + '-' + String(hoy.getMonth()+1).padStart(2,'0');
+  const pend = pendientes();
+
+  const obraTodos = [...(cacheObras || []), ...pend.filter(f => f._src === 'obra')];
+  const obraMia   = obraTodos.filter(f => f.quien === YO);
+  const persMia   = [...(cachePersonal || []), ...pend.filter(f => f._src === 'personal')];
+  const todasMias = [...obraMia, ...persMia];
+
+  const suma = a => a.reduce((s, f) => s + num(f.monto), 0);
+  const delMes = a => a.filter(f => f.fecha.startsWith(ym));
+
+  const mesObra = suma(delMes(obraMia));
+  const mesPers = suma(delMes(persMia));
+  const mesMio  = mesObra + mesPers;
+
+  const meses = proyectar(todasMias).filter(m => m.items.length);
+  const comprometido = meses.reduce((s, m) => s + m.items.reduce((x, i) => x + i.v, 0), 0);
+
+  // ===== HERO: lo mío de este mes, partido en dos =====
+  let html = avisoParcial() +
+    '<section class="hero">' +
+      '<div class="etiqueta">Lo que gastaste este mes</div>' +
+      '<div class="total money">' + fmt$(mesMio) + '</div>' +
+      '<svg class="onda" viewBox="0 0 220 14" aria-hidden="true">' +
+        '<path d="M2 8 Q30 2 58 8 T114 8 T170 8 T226 8" fill="none" stroke="#C98F5F" stroke-width="1.6" stroke-linecap="round" opacity=".7"/>' +
+      '</svg>' +
+      '<div class="leyenda">' +
+        '<span><i style="background:#C98F5F"></i>Obra <b>' + fmt$(mesObra) + '</b></span>' +
+        '<span><i style="background:' + ACCENT + '"></i>Personal <b>' + fmt$(mesPers) + '</b></span>' +
+      '</div>' +
+    '</section>';
+
+  // ===== BLOQUE 1: OBRA FAGU =====
+  const totalObraTodos = suma(obraTodos);
+  const totalObraMia   = suma(obraMia);
+  const porQuien = {jose:0, facu:0, agus:0};
+  const porProy = {};
+  for(const f of obraTodos){
+    porQuien[f.quien] = (porQuien[f.quien] || 0) + num(f.monto);
+    if(f.quien === YO) porProy[f.proyecto] = (porProy[f.proyecto] || 0) + num(f.monto);
+  }
+
+  html += '<div class="bloque"><h2>🏗️ Obra FAGU</h2>' +
+          '<span class="bl-sub">entre los tres</span></div>';
+
+  if(!obraTodos.length){
+    html += '<div class="vacio"><b>Todavía no hay gastos de obra</b>Cargá el primero desde la pestaña Cargar.</div>';
+  } else {
+    html += '<div class="stat-grid">' +
+      '<div class="stat-card stat-card--mio">' +
+        '<div class="lbl">Lo que pusiste vos</div>' +
+        '<div class="val money">' + fmt$(totalObraMia) + '</div>' +
+        '<div class="sub">' + obraMia.length + ' gasto' + (obraMia.length === 1 ? '' : 's') + '</div>' +
+      '</div>' +
+      '<div class="stat-card stat-card--obra">' +
+        '<div class="lbl">Total de la obra</div>' +
+        '<div class="val money">' + fmt$(totalObraTodos) + '</div>' +
+        '<div class="sub">' + obraTodos.length + ' gastos entre los tres</div>' +
+      '</div></div>';
+
+    // Quién puso cuánto — apilada + barras
+    const pct = q => totalObraTodos ? (porQuien[q] / totalObraTodos * 100) : 0;
+    const maxQ = Math.max(...Object.values(porQuien), 1);
+    html += '<section class="card"><h3>Cuánto puso cada uno</h3>' +
+      '<div class="stacked" role="img" aria-label="' +
+        ['jose','facu','agus'].map(q => NOMBRES[q] + ' ' + Math.round(pct(q)) + '%').join(', ') + '">' +
+        ['jose','facu','agus'].filter(q => porQuien[q] > 0).map(q =>
+          '<i style="width:' + pct(q).toFixed(1) + '%; background:var(--p-' + q + ')"></i>').join('') +
+      '</div>' +
+      '<div class="bars" style="margin-top:var(--sp-4)">' +
+      ['jose','facu','agus'].map(q =>
+        '<div class="bar-row bar-row--' + q + '">' +
+          '<span class="quien">' + (q === YO ? 'Vos' : NOMBRES[q]) + '</span>' +
+          '<div class="bar-track"><div class="bar-fill" style="--w:' + ((porQuien[q] || 0) / maxQ * 100).toFixed(1) + '%"></div></div>' +
+          '<span class="cuanto money">' + fmt$(porQuien[q] || 0) + '</span>' +
+        '</div>').join('') +
+      '</div></section>';
+
+    // Si tocó las dos obras, cómo se repartió LO SUYO
+    const proys = Object.keys(porProy).filter(p => porProy[p]);
+    if(proys.length > 1){
+      html += '<section class="card"><h3>Lo tuyo por obra</h3>' +
+        proys.sort((a, b) => porProy[b] - porProy[a]).map(p =>
+          '<div class="tj-row"><span>' + esc(PROYECTOS[p] || p) + '</span><b class="money">' + fmt$(porProy[p]) + '</b></div>').join('') +
+        '</section>';
+    }
+  }
+
+  // ===== BLOQUE 2: MIS GASTOS PERSONALES =====
+  const persMes = delMes(persMia);
+  const totalPersHist = suma(persMia);
+  const d30 = new Date(); d30.setDate(d30.getDate() - 30);
+  const corte30 = isoLocal(d30);
+  const pers30 = persMia.filter(f => f.fecha >= corte30);
+
+  html += '<div class="bloque"><h2>👤 Mis gastos personales</h2>' +
+          '<span class="bl-sub">solo tuyo</span></div>';
+
+  if(!persMia.length){
+    html += '<div class="vacio"><b>Todavía no cargaste nada personal</b>Cambiá el selector a 👤 Personal en Cargar.</div>';
+  } else {
+    html += '<div class="stat-grid">' +
+      '<div class="stat-card stat-card--mio">' +
+        '<div class="lbl">Este mes</div>' +
+        '<div class="val money">' + fmt$(mesPers) + '</div>' +
+        '<div class="sub">' + persMes.length + ' gasto' + (persMes.length === 1 ? '' : 's') + '</div>' +
+      '</div>' +
+      '<div class="stat-card stat-card--pearl">' +
+        '<div class="lbl">Últimos 30 días</div>' +
+        '<div class="val money">' + fmt$(suma(pers30)) + '</div>' +
+        '<div class="sub">histórico ' + fmt$(totalPersHist) + '</div>' +
+      '</div></div>';
+
+    const porMetodo = {}, porTarjeta = {};
+    for(const f of persMes){
+      porMetodo[f.metodo] = (porMetodo[f.metodo] || 0) + num(f.monto);
+      if(f.tarjeta) porTarjeta[f.tarjeta] = (porTarjeta[f.tarjeta] || 0) + num(f.monto);
+    }
+    const metodos = ['efectivo','transferencia','debito','credito'].filter(m => porMetodo[m]);
+    if(metodos.length){
+      const maxM = Math.max(...metodos.map(m => porMetodo[m]), 1);
+      html += '<section class="card"><h3>Este mes por método</h3><div class="bars bars--metodo">' +
+        metodos.map(m =>
+          '<div class="bar-row bar-row--mio"><span class="quien">' + METODO_TXT[m] + '</span>' +
+          '<div class="bar-track"><div class="bar-fill" style="--w:' + (porMetodo[m] / maxM * 100).toFixed(1) + '%"></div></div>' +
+          '<span class="cuanto money">' + fmt$(porMetodo[m]) + '</span></div>').join('') +
+        '</div></section>';
+    }
+    const tarjetas = Object.keys(porTarjeta);
+    if(tarjetas.length){
+      html += '<section class="card"><h3>Este mes por tarjeta</h3>' +
+        tarjetas.sort((a, b) => porTarjeta[b] - porTarjeta[a]).map(t =>
+          '<div class="tj-row"><span>' + esc(t) + '</span><b class="money">' + fmt$(porTarjeta[t]) + '</b></div>').join('') +
+        '</section>';
+    }
+  }
+
+  // ===== GASTO POR MES (lo mío, apilado) =====
+  html += '<div class="bloque"><h2>Tu gasto mes a mes</h2></div>' +
+          '<section class="card">' + chartMeses(obraMia, persMia) + '</section>';
+
+  // ===== COMPROMISOS QUE VIENEN =====
+  html += '<div class="bloque"><h2>Compromisos que vienen</h2></div>';
+  if(meses.length){
+    html += meses.map(mes => {
+      const t = mes.items.reduce((s, i) => s + i.v, 0);
+      let nombre = new Date(mes.y, mes.m, 1).toLocaleDateString('es-AR', {month:'long'});
+      nombre = nombre.charAt(0).toUpperCase() + nombre.slice(1);
+      if(mes.y !== hoy.getFullYear()) nombre += ' ' + mes.y;
+      return '<div class="mes-card">' +
+        '<div class="mes-head"><span class="mes-nombre">' + esc(nombre) + '</span><span class="mes-total money">' + fmt$(t) + '</span></div>' +
+        mes.items.map(i =>
+          '<div class="mes-item"><span class="dos-lineas">' +
+            '<span class="mes-t">' + (i.rec ? '🔁 ' : '') + esc(i.t) + '</span>' +
+            '<span class="mes-sub">' + esc(i.sub) + '</span></span>' +
+          (i.cuota ? '<span class="cuota-n">' + i.cuota + '</span>' : '') +
+          '<b class="money">' + fmt$(i.v) + '</b></div>').join('') +
+        '</div>';
+    }).join('');
+    html += '<p class="pie">Suma cuotas de crédito + gastos que se repiten. Las cuotas empiezan el mes siguiente a la compra. Total comprometido: ' + fmt$(comprometido) + '.</p>';
+  } else {
+    html += '<div class="vacio"><b>Nada proyectado</b>Sin cuotas pendientes ni gastos que se repitan.</div>';
+  }
+
+  $('res-contenido').innerHTML = html;
+}
+
+// ---------- arranque ----------
+if(location.hash === '#historial') setVista('historial');
+if(location.hash === '#resumen' || location.hash === '#proximos') setVista('resumen');
+pintarRec();
+reintentarPendientes(false);
+refrescarPendientes();
+// Si el navegador no deja registrar el worker (modo incognito, política del
+// equipo), la app funciona igual online: no ensuciamos la consola por eso.
+if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>
