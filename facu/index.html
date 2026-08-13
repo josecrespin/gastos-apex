@@ -626,7 +626,10 @@ async function rpcLista(rpc, clave){
   }
   nubeLista = true;
   const filas = await r.json();
-  return Array.isArray(filas) ? filas : [];
+  if(!Array.isArray(filas)) return [];
+  // `fecha` se usa para ordenar, agrupar y proyectar. Una sola fila con
+  // fecha nula tiraba TODO el render (pantalla trabada en "Cargando…").
+  return filas.map(f => (typeof f.fecha === 'string' ? f : {...f, fecha: f.fecha ? String(f.fecha) : ''}));
 }
 
 // Las dos fuentes en paralelo. Si una falla, la app igual muestra la otra.
@@ -649,14 +652,18 @@ function pendientes(){
   const enServer = new Set([...(cacheObras||[]), ...(cachePersonal||[])].map(f => f.local_id).filter(Boolean));
   return leerLS()
     .filter(x => x.estado === 'pendiente' && !enServer.has(x.local_id))
-    .map(x => ({...x, _src: destDe(x), _pendiente:true, id: Infinity}));
+    .map(x => ({...x, fecha: String(x.fecha || hoyLocal()), _src: destDe(x), _pendiente:true, id: Infinity}));
 }
 
-// Mis filas de obra (las que cargué yo) + mis personales + la cola.
-const misObras     = () => (cacheObras || []).filter(f => f.quien === YO);
+// El Historial muestra la obra COMPLETA (los tres hermanos — es plata
+// compartida y el Resumen ya dice "18 gastos entre los tres") más mis
+// gastos personales y lo que quedó en cola. Antes filtraba la obra por
+// `quien === YO`: quien todavía no había cargado nada veía "Sin gastos
+// todavía" aunque la obra tuviera 18 gastos.
+const filasObra    = () => (cacheObras || []);
 const misPersonales= () => (cachePersonal || []);
 function mias(){
-  return [...pendientes(), ...misObras(), ...misPersonales()];
+  return [...pendientes(), ...filasObra(), ...misPersonales()];
 }
 
 // ---------- vistas ----------
@@ -677,6 +684,12 @@ $('refrescar-res').addEventListener('click', () => abrirResumen(true));
 const htmlError = () =>
   '<div class="vacio"><b>' + (navigator.onLine ? 'Error del servidor' : 'Sin conexión') +
   '</b>Tocá ↻ Actualizar para probar de nuevo.</div>';
+
+// Red de seguridad: si el dibujado falla, se muestra el motivo en pantalla
+// en vez de dejar el "Cargando…" para siempre.
+const htmlFalla = e =>
+  '<div class="vacio"><b>No se pudo dibujar la lista</b>' +
+  esc(String((e && e.message) || e)) + '<br>Tocá ↻ Actualizar.</div>';
 
 function avisoParcial(){
   if(!ultimoFallo) return '';
@@ -707,7 +720,10 @@ async function abrirHistorial(force){
     try{ await traerTodo(true); }
     catch(e){ cont.innerHTML = htmlError(); return; }
   }
-  renderHistorial();
+  // Si el render explota, el usuario tiene que VER algo — antes se quedaba
+  // la pantalla trabada en "Cargando…" sin ninguna pista.
+  try{ renderHistorial(); }
+  catch(e){ cont.innerHTML = htmlFalla(e); }
 }
 
 function coincide(f){
@@ -737,13 +753,16 @@ function filaHTML(f){
   const cola = f._pendiente ? '<span class="badge badge--cola">⏳ en cola</span>' : '';
   const thumb = f.foto_path
     ? '<button class="thumb" data-foto="' + esc(f.foto_path) + '" aria-label="Ver factura"><span>📷</span></button>' : '';
-  const importe = (f.relevar && !num(f.monto)) ? '$ —' : fmt$(num(f.monto));
+  const importe = (f.relevar && !num(f.monto)) ? '$ —' : fmt$(montoEnt(f));
   const clase = f._src === 'obra' ? (PROY_CLASE[f.proyecto] || 'obra') : 'mio';
+  // En obra ahora se ven los gastos de los tres: hay que decir quién pagó.
+  const quien = f._src === 'obra'
+    ? '<div class="f">' + (f.quien === YO ? 'Vos' : (NOMBRES[f.quien] || '')) + '</div>' : '';
   return '<div class="gasto gasto--sinavatar gasto--' + clase + (thumb ? ' gasto--conthumb' : '') + '">' +
     '<div class="info"><div class="desc">' + esc(f.descripcion || '(sin detalle)') + '</div>' +
     '<div class="meta">' + chipFuente(f) + metodo + extra + rec + rev + cola + '</div></div>' +
     thumb +
-    '<div class="importe"><div class="m money">' + importe + '</div></div>' +
+    '<div class="importe"><div class="m money">' + importe + '</div>' + quien + '</div>' +
   '</div>';
 }
 
@@ -751,7 +770,7 @@ function renderHistorial(){
   const cont = $('hist-lista');
   if(!cacheObras && !cachePersonal) return;
   // Los pendientes primero (id = Infinity los deja arriba del día).
-  const todas = mias().sort((a, b) => b.fecha.localeCompare(a.fecha) || num(b.id) - num(a.id));
+  const todas = mias().sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')) || num(b.id) - num(a.id));
   const filtradas = todas.filter(coincide);
 
   const nPend = todas.filter(f => f._pendiente).length;
@@ -819,7 +838,8 @@ async function abrirResumen(force){
     try{ await traerTodo(true); }
     catch(e){ cont.innerHTML = htmlError(); return; }
   }
-  renderResumen();
+  try{ renderResumen(); }
+  catch(e){ cont.innerHTML = htmlFalla(e); return; }
   $('actualizado').textContent = 'Actualizado ' + new Date().toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'});
 }
 

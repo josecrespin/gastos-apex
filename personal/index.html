@@ -194,6 +194,28 @@ const fmtK = n => n >= 1e6 ? (n/1e6).toLocaleString('es-AR', {maximumFractionDig
               : n >= 1e3 ? Math.round(n/1e3) + ' k' : String(Math.round(n));
 const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(36).slice(2));
 
+// EL redondeo: cada gasto se redondea UNA sola vez, acá, al peso que se ve
+// en su fila. De ahí para arriba solo se suman enteros, así cualquier total
+// es exactamente la suma de lo que se muestra (igual que en las otras apps).
+const montoEnt = f => Math.round(Number(f.monto) || 0);
+
+// Para lo único que sigue dando decimales: las cuotas (un gasto dividido en
+// N). Devuelve las partes en pesos enteros ajustadas para que sumen EXACTO
+// el total redondeado. Método del resto mayor: el peso que sobra o falta va
+// a la parte con la fracción más grande.
+function partesRedondeadas(total, partes){
+  const objetivo = Math.round(Number(total) || 0);
+  const base = partes.map(v => Math.floor(Number(v) || 0));
+  const orden = partes
+    .map((v, i) => ({i, frac: (Number(v) || 0) - Math.floor(Number(v) || 0)}))
+    .sort((a, b) => b.frac - a.frac);
+  let resto = objetivo - base.reduce((s, v) => s + v, 0);
+  if(!orden.length) return base;
+  for(let k = 0; resto > 0; k++, resto--) base[orden[k % orden.length].i]++;
+  for(let k = 0; resto < 0; k++, resto++) base[orden[orden.length - 1 - (k % orden.length)].i]--;
+  return base;
+}
+
 let toastTimer = null;
 function toast(msg, tipo){
   const t = $('toast');
@@ -470,7 +492,10 @@ async function traerFilas(force){
   });
   if(!r.ok) throw new Error('server');
   const filas = await r.json();
-  filasCache = Array.isArray(filas) ? filas : [];
+  // `fecha` se usa para ordenar, agrupar y proyectar. Una sola fila con
+  // fecha nula tiraba TODO el render (pantalla trabada en "Cargando…").
+  filasCache = (Array.isArray(filas) ? filas : [])
+    .map(f => (typeof f.fecha === 'string' ? f : {...f, fecha: f.fecha ? String(f.fecha) : ''}));
   return filasCache;
 }
 
@@ -519,6 +544,12 @@ function olvidarClave(destino){
 $('cambiar-clave-h').addEventListener('click', () => olvidarClave('historial'));
 $('cambiar-clave-r').addEventListener('click', () => olvidarClave('resumen'));
 
+// Red de seguridad: si el dibujado falla, se muestra el motivo en pantalla
+// en vez de dejar el "Cargando…" para siempre.
+const htmlFalla = e =>
+  '<div class="vacio"><b>No se pudo dibujar la lista</b>' +
+  esc(String((e && e.message) || e)) + '<br>Tocá ↻ Actualizar.</div>';
+
 // ---------- HISTORIAL ----------
 let buscaTimer = null;
 $('buscador').addEventListener('input', () => {
@@ -549,7 +580,8 @@ async function abrirHistorial(force){
       return;
     }
   }
-  renderHistorial();
+  try{ renderHistorial(); }
+  catch(e){ cont.innerHTML = htmlFalla(e); }
   $('cambiar-clave-h').hidden = false;
 }
 
@@ -575,7 +607,7 @@ function filaHTML(f, mapa){
   const cola = f._pendiente ? '<span class="badge badge--cola">⏳ en cola</span>' : '';
   const thumb = f.foto_path
     ? '<button class="thumb" data-foto="' + esc(f.foto_path) + '" aria-label="Ver factura"><span>📷</span></button>' : '';
-  const importe = (f.relevar && !Number(f.monto)) ? '$ —' : fmt$(Number(f.monto));
+  const importe = (f.relevar && !Number(f.monto)) ? '$ —' : fmt$(montoEnt(f));
   return '<div class="gasto gasto--sinavatar gasto--' + cat + (thumb ? ' gasto--conthumb' : '') + '">' +
     '<div class="info"><div class="desc">' + esc(f.descripcion || '(sin detalle)') + '</div>' +
     '<div class="meta">' + badge + extra + neg + rec + rev + cola + '</div></div>' +
@@ -592,12 +624,12 @@ function renderHistorial(){
   const enServer = new Set(filasCache.map(f => f.local_id).filter(Boolean));
   const pendientes = leerLS()
     .filter(x => x.estado === 'pendiente' && !enServer.has(x.local_id))
-    .map(x => ({...x, _pendiente:true, id: Infinity}));
+    .map(x => ({...x, fecha: String(x.fecha || hoyLocal()), _pendiente:true, id: Infinity}));
   const todas = [...pendientes, ...filasCache]
-    .sort((a, b) => b.fecha.localeCompare(a.fecha) || (b.id || 0) - (a.id || 0));
+    .sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')) || (b.id || 0) - (a.id || 0));
   const filtradas = todas.filter(f => coincide(f, mapa));
 
-  const totalF = filtradas.reduce((s, f) => s + Number(f.monto), 0);
+  const totalF = filtradas.reduce((s, f) => s + montoEnt(f), 0);
   $('hist-stats').textContent = filtradas.length
     ? filtradas.length + ' gasto' + (filtradas.length === 1 ? '' : 's') + ' · ' + fmt$(totalF)
     : '';
@@ -614,7 +646,7 @@ function renderHistorial(){
     if(f.fecha !== diaActual){
       diaActual = f.fecha;
       const delDia = filtradas.filter(x => x.fecha === f.fecha);
-      const totDia = delDia.reduce((s, x) => s + Number(x.monto), 0);
+      const totDia = delDia.reduce((s, x) => s + montoEnt(x), 0);
       html += '<div class="dia-head"><span class="dia">' + esc(etiquetaDia(f.fecha)) + '</span>' +
               '<b class="money">' + fmt$(totDia) + '</b></div>';
     }
@@ -669,7 +701,8 @@ async function abrirResumen(force){
     $('cambiar-clave-r').hidden = false;
     return;
   }
-  renderResumen(filasCache);
+  try{ renderResumen(filasCache); }
+  catch(e){ cont.innerHTML = htmlFalla(e); $('cambiar-clave-r').hidden = false; return; }
   $('cambiar-clave-r').hidden = false;
   $('actualizado').textContent = 'Actualizado ' + new Date().toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'});
 }
@@ -697,12 +730,12 @@ function proyectar(filas){
         const nro = k - base + 1;                  // el gasto original fue el pago 1
         if(N && nro > N) break;
         meses[k].items.push({t: etiqueta, sub: METODO_TXT[f.metodo] || f.metodo,
-                             rec:true, cuota: N ? nro + '/' + N : null, v: Number(f.monto)});
+                             rec:true, cuota: N ? nro + '/' + N : null, v: montoEnt(f)});
       }
     }
     if(esCredito){
       const n = Math.max(1, Number(f.cuotas) || 1);
-      const cuota = Number(f.monto) / n;
+      const cuota = montoEnt(f) / n;
       for(let i = 1; i <= n; i++){
         const k = base + i;
         if(k >= 0 && k < meses.length)
@@ -729,7 +762,7 @@ function chartMeses(filas, color){
     const d = new Date(hoy.getFullYear(), hoy.getMonth() - k, 1);
     const ym = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
     labs.push(d.toLocaleDateString('es-AR', {month:'short'}).replace('.',''));
-    vals.push(filas.filter(f => f.fecha.startsWith(ym)).reduce((s, f) => s + Number(f.monto), 0));
+    vals.push(filas.filter(f => f.fecha.startsWith(ym)).reduce((s, f) => s + montoEnt(f), 0));
   }
   const max = Math.max(...vals, 1);
   const W = 320, base = 124, top = 26, bw = 34;
@@ -755,26 +788,28 @@ function renderResumen(filas){
   const hoy = new Date();
   const ym = hoy.getFullYear() + '-' + String(hoy.getMonth()+1).padStart(2,'0');
   const delMes = filas.filter(f => f.fecha.startsWith(ym));
-  const totalMes = delMes.reduce((s, f) => s + Number(f.monto), 0);
-  const totalHist = filas.reduce((s, f) => s + Number(f.monto), 0);
+  const totalMes = delMes.reduce((s, f) => s + montoEnt(f), 0);
+  const totalHist = filas.reduce((s, f) => s + montoEnt(f), 0);
 
   const porCat = {personal:0, negocio:0};
   const porMetodo = {};
   const porTarjeta = {};
   for(const f of delMes){
-    porCat[categoriaDe(f, mapa)] += Number(f.monto);
-    porMetodo[f.metodo] = (porMetodo[f.metodo] || 0) + Number(f.monto);
-    if(f.tarjeta) porTarjeta[f.tarjeta] = (porTarjeta[f.tarjeta] || 0) + Number(f.monto);
+    porCat[categoriaDe(f, mapa)] += montoEnt(f);
+    porMetodo[f.metodo] = (porMetodo[f.metodo] || 0) + montoEnt(f);
+    if(f.tarjeta) porTarjeta[f.tarjeta] = (porTarjeta[f.tarjeta] || 0) + montoEnt(f);
   }
   const pctCat = c => totalMes ? (porCat[c] / totalMes * 100) : 0;
 
   const d30 = new Date(); d30.setDate(d30.getDate() - 30);
   const corte30 = isoLocal(d30);
   const ult30 = filas.filter(f => f.fecha >= corte30);
-  const total30 = ult30.reduce((s, f) => s + Number(f.monto), 0);
+  const total30 = ult30.reduce((s, f) => s + montoEnt(f), 0);
 
+  // Cada mes se redondea entero y el comprometido suma esos totales,
+  // para que el stat card diga exactamente lo que suman las tarjetas.
   const meses = proyectar(filas).filter(m => m.items.length);
-  const comprometido = meses.reduce((s, m) => s + m.items.reduce((x, i) => x + i.v, 0), 0);
+  const comprometido = meses.reduce((s, m) => s + Math.round(m.items.reduce((x, i) => x + i.v, 0)), 0);
 
   // HERO: gastado este mes + onda firma + split Negocio / Personal
   let html =
@@ -839,19 +874,22 @@ function renderResumen(filas){
   // COMPROMISOS QUE VIENEN
   html += '<div class="seccion"><h2>Compromisos que vienen</h2></div>';
   if(meses.length){
+    // Las cuotas caen en decimales: cada mes reparte su propio redondeo
+    // para que las filas den exacto el total del mes.
     html += meses.map(mes => {
       const t = mes.items.reduce((s, i) => s + i.v, 0);
+      const itemsR = partesRedondeadas(t, mes.items.map(i => i.v));
       let nombre = new Date(mes.y, mes.m, 1).toLocaleDateString('es-AR', {month:'long'});
       nombre = nombre.charAt(0).toUpperCase() + nombre.slice(1);
       if(mes.y !== new Date().getFullYear()) nombre += ' ' + mes.y;
       return '<div class="mes-card">' +
-        '<div class="mes-head"><span class="mes-nombre">' + esc(nombre) + '</span><span class="mes-total money">' + fmt$(t) + '</span></div>' +
-        mes.items.map(i =>
+        '<div class="mes-head"><span class="mes-nombre">' + esc(nombre) + '</span><span class="mes-total money">' + fmt$(Math.round(t)) + '</span></div>' +
+        mes.items.map((i, ix) =>
           '<div class="mes-item"><span class="dos-lineas">' +
             '<span class="mes-t">' + (i.rec ? '🔁 ' : '') + esc(i.t) + '</span>' +
             '<span class="mes-sub">' + esc(i.sub) + '</span></span>' +
           (i.cuota ? '<span class="cuota-n">' + i.cuota + '</span>' : '') +
-          '<b class="money">' + fmt$(i.v) + '</b></div>').join('') +
+          '<b class="money">' + fmt$(itemsR[ix]) + '</b></div>').join('') +
         '</div>';
     }).join('');
     html += '<p class="pie">Suma cuotas de crédito + gastos que se repiten. Las cuotas empiezan el mes siguiente a la compra.</p>';
