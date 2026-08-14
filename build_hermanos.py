@@ -10,7 +10,7 @@ import os, shutil, json, re
 
 RAIZ = os.path.dirname(os.path.abspath(__file__))
 PLANTILLA = os.path.join(RAIZ, '_plantilla-hermano.html')
-SW_CACHE_V = 3          # subir cuando cambie el shell
+SW_CACHE_V = 4          # subir cuando cambie el shell
 
 HERMANOS = {
     'agus': {

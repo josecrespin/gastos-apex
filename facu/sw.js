@@ -2,7 +2,7 @@
 // Facu ve siempre la ultima version apenas hay senal; el cache queda
 // como respaldo offline. Scope: /gastos-apex/facu/.
 // Los POST a Supabase nunca pasan por aca (solo GET same-origin).
-const CACHE = 'gastos-facu5-v3';
+const CACHE = 'gastos-facu5-v4';
 const SHELL = ['.', 'index.html', '../apex-sync.css', 'manifest.webmanifest',
                'icon-180.png', 'icon-192.png', 'icon-512.png'];
 

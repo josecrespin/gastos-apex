@@ -220,6 +220,78 @@
   </button>
 </nav>
 
+<!-- ============ HOJA DE EDICIÓN (v8) ============ -->
+<div class="hoja-fondo" id="ed-fondo" hidden></div>
+<section class="hoja" id="ed-hoja" role="dialog" aria-modal="true" aria-labelledby="ed-titulo" tabindex="-1" hidden>
+  <div class="hoja-grip" aria-hidden="true"></div>
+  <div class="hoja-head">
+    <h2 id="ed-titulo">Editar gasto</h2>
+    <button class="hoja-x" id="ed-cerrar" aria-label="Cerrar sin guardar">✕</button>
+  </div>
+  <p class="hoja-sub" id="ed-sub"></p>
+
+  <div class="grupo">
+    <label for="ed-monto">Monto</label>
+    <div class="ed-monto-box">
+      <span class="signo" aria-hidden="true">$</span>
+      <input id="ed-monto" class="field field--monto money" type="text" inputmode="numeric" autocomplete="off" placeholder="0">
+    </div>
+  </div>
+
+  <div class="grupo">
+    <label for="ed-desc">Descripción</label>
+    <input id="ed-desc" class="field" type="text" autocomplete="off" maxlength="120" placeholder="¿En qué?">
+  </div>
+
+  <div class="grupo">
+    <label for="ed-fecha">Fecha</label>
+    <input id="ed-fecha" class="field" type="date">
+  </div>
+
+  <div class="grupo" id="ed-grupo-proyecto" hidden>
+    <label>¿En qué obra?</label>
+    <div class="chips" id="ed-chips-proyecto">
+      <button class="chip chip--obra" data-v="fagu_obra">FAGU</button>
+      <button class="chip chip--tafi" data-v="tafi">Casa Tafí</button>
+    </div>
+  </div>
+
+  <div class="grupo">
+    <label>Método</label>
+    <div class="chips" id="ed-chips-metodo">
+      <button class="chip" data-v="efectivo">Efectivo</button>
+      <button class="chip" data-v="transferencia">Transf.</button>
+      <button class="chip" data-v="debito">Débito</button>
+      <button class="chip" data-v="credito">Crédito</button>
+    </div>
+  </div>
+
+  <div class="grupo" id="ed-grupo-tarjeta" hidden>
+    <label>Tarjeta</label>
+    <div class="chips" id="ed-chips-tarjeta"></div>
+    <input id="ed-tarjeta-otra" class="field" type="text" maxlength="40" placeholder="¿Qué tarjeta?" style="margin-top:10px" hidden>
+  </div>
+
+  <div class="grupo" id="ed-grupo-cuotas" hidden>
+    <label>Cuotas</label>
+    <div class="chips chips--compact" id="ed-chips-cuotas"></div>
+  </div>
+
+  <button class="btn-primary" id="ed-guardar">Guardar cambios</button>
+  <button class="btn-borrar" id="ed-borrar">🗑 Eliminar gasto</button>
+
+  <div class="confirmar" id="ed-confirmar" hidden>
+    <b>¿Seguro que querés borrar este gasto?</b>
+    <span>No se puede deshacer.</span>
+    <div class="confirmar-btns">
+      <button class="btn-ghost" id="ed-no">No, dejalo</button>
+      <button class="btn-borrar" id="ed-si">Sí, borrar</button>
+    </div>
+  </div>
+
+  <p class="hoja-nota" id="ed-nota" hidden></p>
+</section>
+
 <div class="overlay" id="foto-overlay"><img id="foto-grande" alt="factura"><span>tocá para cerrar</span></div>
 <div class="toast" id="toast" role="status"></div>
 
@@ -758,11 +830,20 @@ function filaHTML(f){
   // En obra ahora se ven los gastos de los tres: hay que decir quién pagó.
   const quien = f._src === 'obra'
     ? '<div class="f">' + (f.quien === YO ? 'Vos' : (NOMBRES[f.quien] || '')) + '</div>' : '';
-  return '<div class="gasto gasto--sinavatar gasto--' + clase + (thumb ? ' gasto--conthumb' : '') + '">' +
+  // v8: la fila se toca para corregirla. Las de obra de OTRO hermano no
+  // llevan lápiz (solo el que la cargó la puede editar).
+  const edita = editable(f);
+  const k = claveFila(f);
+  const lapiz = edita
+    ? '<button class="ed-lapiz" aria-label="Editar ' + esc(f.descripcion || 'gasto') + '">✏️</button>' : '';
+  const cls = 'gasto gasto--sinavatar gasto--' + clase + (thumb ? ' gasto--conthumb' : '') +
+              (edita ? ' gasto--editable' : '');
+  return '<div class="' + cls + '"' + (edita ? ' data-k="' + esc(k) + '"' : '') + '>' +
     '<div class="info"><div class="desc">' + esc(f.descripcion || '(sin detalle)') + '</div>' +
     '<div class="meta">' + chipFuente(f) + metodo + extra + rec + rev + cola + '</div></div>' +
     thumb +
     '<div class="importe"><div class="m money">' + importe + '</div>' + quien + '</div>' +
+    lapiz +
   '</div>';
 }
 
@@ -772,6 +853,10 @@ function renderHistorial(){
   // Los pendientes primero (id = Infinity los deja arriba del día).
   const todas = mias().sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')) || num(b.id) - num(a.id));
   const filtradas = todas.filter(coincide);
+
+  // Índice para la hoja de edición: de la fila del HTML al objeto real.
+  filasIdx.clear();
+  for(const f of filtradas) filasIdx.set(claveFila(f), f);
 
   const nPend = todas.filter(f => f._pendiente).length;
   const totalF = filtradas.reduce((s, f) => s + montoEnt(f), 0);
@@ -801,7 +886,13 @@ function renderHistorial(){
   cont.innerHTML = html;
   cont.querySelectorAll('[data-foto]').forEach(el => {
     cargarThumb(el);
-    el.addEventListener('click', () => verFoto(el.dataset.foto));
+    el.addEventListener('click', e => { e.stopPropagation(); verFoto(el.dataset.foto); });
+  });
+  cont.querySelectorAll('.gasto[data-k]').forEach(el => {
+    el.addEventListener('click', e => {
+      if(e.target.closest('[data-foto]')) return;   // la foto es su propio botón
+      abrirEditor(el.dataset.k);
+    });
   });
 }
 
@@ -1115,6 +1206,278 @@ function renderResumen(){
 
   $('res-contenido').innerHTML = html;
 }
+
+// ============================================================
+// EDITAR / ELIMINAR (v8) — tocá una fila del Historial y se abre la hoja
+// ============================================================
+// Servidor: una RPC por app, cada una con SU clave (la maestra NUNCA viaja
+// en el código de una app):
+//   fila de obra → gasto_editar_obra / gasto_borrar_obra (clave familiar +
+//                  `quien`: solo deja tocar filas cargadas por MÍ)
+//   fila mía     → gasto_editar_facu / gasto_borrar_facu (mi clave;
+//                  esas funciones solo saben escribir en gastos_facu)
+// Cola local: si el gasto todavía no subió, se corrige/borra en el teléfono.
+// Modo compatibilidad: si el SQL v8 todavía no corrió, la RPC no existe
+// (404 / PGRST202) → se avisa amablemente y NO se toca nada.
+const RPC_ED_OBRA = 'gasto_editar_obra';
+const RPC_BO_OBRA = 'gasto_borrar_obra';
+const RPC_ED_MIO  = 'gasto_editar_facu';
+const RPC_BO_MIO  = 'gasto_borrar_facu';
+const TARJETAS_ED = ['Visa','Mastercard'];
+
+const filasIdx = new Map();
+const claveFila = f => f._pendiente ? 'L' + f.local_id : (f._src || 'x') + ':' + f.id;
+
+// Los gastos de obra de otro hermano se ven pero no se tocan.
+function editable(f){
+  if(f._pendiente) return !!f.local_id;
+  if(f.id == null || !isFinite(num(f.id))) return false;
+  return f._src !== 'obra' || f.quien === YO;
+}
+
+let ed = null;   // {f, esObra, orig, sel}
+
+function abrirEditor(k){
+  const f = filasIdx.get(k);
+  if(!f || !editable(f)) return;
+  const esObra = f._src === 'obra';
+  const orig = {
+    monto:       Math.round(num(f.monto)),
+    descripcion: f.descripcion || '',
+    fecha:       f.fecha || hoyLocal(),
+    metodo:      f.metodo || 'efectivo',
+    tarjeta:     f.tarjeta || '',
+    cuotas:      Math.max(1, num(f.cuotas) || 1),
+    proyecto:    f.proyecto || 'fagu_obra',
+  };
+  ed = {f, esObra, orig, sel: {...orig}};
+
+  $('ed-sub').textContent = (esObra ? '🏗️ Gasto de la obra · ' : '👤 Gasto tuyo · ') +
+                            etiquetaDia(orig.fecha) + (f._pendiente ? ' · ⏳ todavía en el teléfono' : '');
+  $('ed-monto').value = orig.monto ? orig.monto.toLocaleString('es-AR') : '';
+  $('ed-desc').value  = orig.descripcion;
+  $('ed-fecha').value = orig.fecha;
+  $('ed-tarjeta-otra').value = '';
+  $('ed-tarjeta-otra').hidden = true;
+
+  $('ed-grupo-proyecto').hidden = !esObra;
+  pintarChipsEd('ed-chips-proyecto', orig.proyecto);
+  // En la obra se paga en efectivo o transferencia; en lo tuyo, los 4.
+  document.querySelectorAll('#ed-chips-metodo .chip').forEach(c => {
+    c.classList.toggle('off', esObra && !METODOS_OBRA.includes(c.dataset.v));
+  });
+  pintarChipsEd('ed-chips-metodo', orig.metodo);
+  aplicarMetodoEd();
+
+  $('ed-confirmar').hidden = true;
+  $('ed-borrar').hidden = false;
+  $('ed-nota').hidden = true;
+  $('ed-guardar').disabled = false; $('ed-guardar').textContent = 'Guardar cambios';
+  abrirHoja();
+}
+
+function abrirHoja(){
+  $('ed-fondo').hidden = false; $('ed-hoja').hidden = false;
+  requestAnimationFrame(() => {
+    $('ed-fondo').classList.add('show');
+    $('ed-hoja').classList.add('show');
+    $('ed-hoja').scrollTop = 0;
+    $('ed-hoja').focus();
+  });
+  document.body.style.overflow = 'hidden';
+}
+function cerrarEditor(){
+  $('ed-hoja').classList.remove('show');
+  $('ed-fondo').classList.remove('show');
+  setTimeout(() => { $('ed-hoja').hidden = true; $('ed-fondo').hidden = true; }, 220);
+  document.body.style.overflow = '';
+  ed = null;
+}
+$('ed-cerrar').addEventListener('click', cerrarEditor);
+$('ed-fondo').addEventListener('click', cerrarEditor);
+document.addEventListener('keydown', e => { if(e.key === 'Escape' && ed) cerrarEditor(); });
+
+function pintarChipsEd(id, valor){
+  document.querySelectorAll('#' + id + ' .chip').forEach(c => c.classList.toggle('on', c.dataset.v === String(valor)));
+}
+function initChipsEd(id, campo, cb){
+  $(id).addEventListener('click', e => {
+    const b = e.target.closest('.chip'); if(!b || b.classList.contains('off') || !ed) return;
+    $(id).querySelectorAll('.chip').forEach(c => c.classList.remove('on'));
+    b.classList.add('on');
+    ed.sel[campo] = campo === 'cuotas' ? parseInt(b.dataset.v, 10) : b.dataset.v;
+    if(cb) cb(b.dataset.v);
+  });
+}
+initChipsEd('ed-chips-proyecto','proyecto');
+initChipsEd('ed-chips-metodo','metodo', aplicarMetodoEd);
+initChipsEd('ed-chips-tarjeta','tarjeta', v => { $('ed-tarjeta-otra').hidden = v !== '__otra'; });
+initChipsEd('ed-chips-cuotas','cuotas');
+
+function aplicarMetodoEd(){
+  if(!ed) return;
+  const m = ed.sel.metodo;
+  const conTarjeta = m === 'debito' || m === 'credito';
+  $('ed-grupo-tarjeta').hidden = !conTarjeta;
+  $('ed-grupo-cuotas').hidden = m !== 'credito';
+  if(conTarjeta) pintarTarjetasEd(); else $('ed-tarjeta-otra').hidden = true;
+  if(m === 'credito') pintarCuotasEd();
+}
+// Las opciones incluyen SIEMPRE lo que ya tenía la fila (aunque sea una
+// tarjeta o un plan de cuotas que la app no ofrece hoy).
+function pintarTarjetasEd(){
+  const t = ed.sel.tarjeta && ed.sel.tarjeta !== '__otra' ? ed.sel.tarjeta : '';
+  const lista = TARJETAS_ED.slice();
+  if(t && lista.indexOf(t) === -1) lista.push(t);
+  $('ed-chips-tarjeta').innerHTML =
+    lista.map(x => '<button class="chip' + (x === t ? ' on' : '') + '" data-v="' + esc(x) + '">' + esc(x) + '</button>').join('') +
+    '<button class="chip' + (t ? '' : ' on') + '" data-v="__otra">Otra</button>';
+  $('ed-tarjeta-otra').hidden = !!t;
+}
+function pintarCuotasEd(){
+  const n = Math.max(1, num(ed.sel.cuotas) || 1);
+  const lista = [1,3,6,12];
+  if(lista.indexOf(n) === -1) lista.push(n);
+  lista.sort((a,b) => a-b);
+  $('ed-chips-cuotas').innerHTML = lista.map(x =>
+    '<button class="chip' + (x === n ? ' on' : '') + '" data-v="' + x + '">' + x + '</button>').join('');
+}
+
+$('ed-monto').addEventListener('input', () => {
+  const n = $('ed-monto').value.replace(/\D/g,'');
+  $('ed-monto').value = n ? Number(n).toLocaleString('es-AR') : '';
+});
+
+// Una llamada de mantenimiento. Devuelve {n} | {compat:true} | {error}
+async function rpcMant(nombre, body){
+  try{
+    const r = await fetch(SUPABASE_URL + '/rest/v1/rpc/' + nombre, {
+      method:'POST', headers:{...H, 'Content-Type':'application/json'},
+      body: JSON.stringify(body),
+    });
+    let txt = ''; try{ txt = await r.text(); }catch(e){}
+    if(r.ok) return {n: Number(txt) || 0};
+    if(esNubeNoLista(r.status, txt)) return {compat:true};
+    return {error: txt || ('HTTP ' + r.status)};
+  }catch(e){ return {error: String((e && e.message) || e)}; }
+}
+
+// Cola local (el gasto todavía no llegó al servidor)
+function aplicarACola(it, c){
+  if('nuevo_monto' in c)       it.monto = c.nuevo_monto;
+  if('nueva_descripcion' in c) it.descripcion = c.nueva_descripcion;
+  if('nueva_fecha' in c)       it.fecha = c.nueva_fecha;
+  if('nuevo_metodo' in c)      it.metodo = c.nuevo_metodo;
+  if('nueva_tarjeta' in c)     it.tarjeta = c.nueva_tarjeta;
+  if('nuevas_cuotas' in c)     it.cuotas = c.nuevas_cuotas;
+  if('nuevo_proyecto' in c)    it.proyecto = c.nuevo_proyecto;
+  // Mismas reglas que la base, para que suba coherente
+  if(it.metodo !== 'credito' && it.metodo !== 'debito') it.tarjeta = null;
+  if(it.metodo !== 'credito') it.cuotas = 1;
+  if(num(it.monto) > 0) it.relevar = false;
+}
+function editarEnCola(f, c){
+  const hist = leerLS();
+  const it = hist.find(x => x.local_id && x.local_id === f.local_id);
+  if(!it) return {n:0};
+  aplicarACola(it, c);
+  escribirLS(hist);
+  return {n:1};
+}
+function borrarDeCola(f){
+  const antes = leerLS();
+  const hist = antes.filter(x => !(x.local_id && x.local_id === f.local_id));
+  escribirLS(hist);
+  refrescarPendientes();
+  return {n: antes.length - hist.length};
+}
+
+function notaEd(msg, tipo){
+  $('ed-nota').textContent = msg;
+  $('ed-nota').hidden = false;
+  toast(msg, tipo || 'warn');
+}
+const MSG_COMPAT = 'La edición se habilita en unos minutos — tu gasto quedó igual';
+
+// soloLocal = el gasto estaba en la cola del teléfono: no hay nada que
+// volver a pedirle al servidor, alcanza con redibujar.
+async function terminarEd(res, msgOk, soloLocal){
+  const btnG = $('ed-guardar');
+  btnG.disabled = false; btnG.textContent = 'Guardar cambios';
+  $('ed-si').disabled = false; $('ed-si').textContent = 'Sí, borrar';
+  if(res.compat){ notaEd(MSG_COMPAT); return; }
+  if(res.error){ notaEd(navigator.onLine ? 'No se pudo guardar — probá de nuevo' : 'Sin conexión — probá al volver la señal', 'error'); return; }
+  if(!res.n){ notaEd('Ese gasto ya no está — actualizá el historial'); return; }
+  if(navigator.vibrate) navigator.vibrate(30);
+  cerrarEditor();
+  toast(msgOk, 'ok');
+  if(soloLocal){ await abrirHistorial(); return; }
+  invalidarCache();
+  await abrirHistorial(true);     // lista y totales al día
+}
+
+$('ed-guardar').addEventListener('click', async () => {
+  if(!ed) return;
+  const f = ed.f, o = ed.orig, s = ed.sel;
+  const monto = Number(($('ed-monto').value || '').replace(/\D/g,''));
+  if(!monto && !f.foto_path){ toast('Poné un monto'); $('ed-monto').focus(); return; }
+  const desc  = $('ed-desc').value.trim();
+  const fecha = $('ed-fecha').value || o.fecha;
+  const esCredito = s.metodo === 'credito';
+  const conTarjeta = esCredito || s.metodo === 'debito';
+  let tarjeta = '';
+  if(conTarjeta){
+    tarjeta = s.tarjeta === '__otra' ? ($('ed-tarjeta-otra').value.trim() || 'Otra') : (s.tarjeta || '');
+  }
+  const cuotas = esCredito ? Math.max(1, num(s.cuotas) || 1) : 1;
+
+  // Solo se manda lo que cambió: nada de reescribir campos por las dudas.
+  const c = {};
+  if(monto !== o.monto) c.nuevo_monto = monto;
+  if(desc !== o.descripcion) c.nueva_descripcion = desc;
+  if(fecha !== o.fecha) c.nueva_fecha = fecha;
+  if(s.metodo !== o.metodo) c.nuevo_metodo = s.metodo;
+  if(conTarjeta && tarjeta && tarjeta !== o.tarjeta) c.nueva_tarjeta = tarjeta;
+  if(esCredito && cuotas !== o.cuotas) c.nuevas_cuotas = cuotas;
+  if(ed.esObra && s.proyecto !== o.proyecto) c.nuevo_proyecto = s.proyecto;
+  if(!Object.keys(c).length){ toast('No cambiaste nada'); cerrarEditor(); return; }
+
+  $('ed-guardar').disabled = true; $('ed-guardar').textContent = 'Guardando…';
+  $('ed-nota').hidden = true;
+  const enCola = !!f._pendiente;
+  const res = enCola
+    ? editarEnCola(f, c)
+    : await rpcMant(ed.esObra ? RPC_ED_OBRA : RPC_ED_MIO,
+        ed.esObra ? {clave: CLAVE_OBRAS, quien: YO, fila_id: f.id, ...c}
+                  : {clave: CLAVE_PERSONAL, fila_id: f.id, ...c});
+  await terminarEd(res, '✓ Cambios guardados', enCola);
+});
+
+// Borrar: dos pasos, siempre.
+$('ed-borrar').addEventListener('click', () => {
+  $('ed-confirmar').hidden = false;
+  $('ed-borrar').hidden = true;
+  $('ed-confirmar').scrollIntoView({block:'nearest', behavior:'smooth'});
+});
+$('ed-no').addEventListener('click', () => {
+  $('ed-confirmar').hidden = true;
+  $('ed-borrar').hidden = false;
+});
+$('ed-si').addEventListener('click', async () => {
+  if(!ed) return;
+  const f = ed.f;
+  const enCola = !!f._pendiente;
+  $('ed-si').disabled = true; $('ed-si').textContent = 'Borrando…';
+  const res = enCola
+    ? borrarDeCola(f)
+    : await rpcMant(ed.esObra ? RPC_BO_OBRA : RPC_BO_MIO,
+        ed.esObra ? {clave: CLAVE_OBRAS, quien: YO, fila_id: f.id}
+                  : {clave: CLAVE_PERSONAL, fila_id: f.id});
+  if(!res.n || res.compat || res.error){       // no se borró: vuelve el botón
+    $('ed-confirmar').hidden = true; $('ed-borrar').hidden = false;
+  }
+  await terminarEd(res, '✓ Gasto eliminado', enCola);
+});
 
 // ---------- arranque ----------
 if(location.hash === '#historial') setVista('historial');

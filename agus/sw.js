@@ -2,7 +2,7 @@
 // Agus ve siempre la ultima version apenas hay senal; el cache queda
 // como respaldo offline. Scope: /gastos-apex/agus/.
 // Los POST a Supabase nunca pasan por aca (solo GET same-origin).
-const CACHE = 'gastos-agus5-v3';
+const CACHE = 'gastos-agus5-v4';
 const SHELL = ['.', 'index.html', '../apex-sync.css', 'manifest.webmanifest',
                'icon-180.png', 'icon-192.png', 'icon-512.png'];
 
