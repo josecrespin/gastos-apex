@@ -297,6 +297,39 @@ function toast(msg, tipo){
   toastTimer = setTimeout(() => t.classList.remove('show'), 3200);
 }
 
+// ============================================================
+// RED DE SEGURIDAD GLOBAL (v9)
+// ------------------------------------------------------------
+// Antes, CUALQUIER excepción suelta dejaba la app muda: los botones no
+// respondían, la consola quedaba limpia y desde afuera era imposible saber
+// qué pasó ("no funciona nada"). Ahora todo error visible se muestra en
+// pantalla con el detalle, así José puede sacarle una foto y mandarla.
+// Regla: la app avisa, nunca se muere en silencio.
+let errVisto = false;
+function mostrarFalla(origen, detalle){
+  if(errVisto) return;          // un solo cartel; no tapar la app con diez
+  errVisto = true;
+  const d = document.createElement('div');
+  d.id = 'falla-global';
+  d.setAttribute('role','alert');
+  d.style.cssText = 'position:fixed;left:12px;right:12px;bottom:96px;z-index:200;' +
+    'background:#3A1410;border:1.5px solid #F2705F;border-radius:14px;padding:14px 16px;' +
+    'color:#FFE9E4;font:600 13px -apple-system,BlinkMacSystemFont,system-ui,sans-serif;' +
+    'box-shadow:0 12px 32px -8px rgba(0,0,0,.7)';
+  d.innerHTML = '<b style="display:block;font-size:14px;margin-bottom:4px">Algo falló en la app</b>' +
+    '<span style="display:block;opacity:.85;word-break:break-word">' + esc(origen + ': ' + detalle) + '</span>' +
+    '<span style="display:block;margin-top:8px;opacity:.7">Mandale esta captura a Jarvis.</span>' +
+    '<button style="margin-top:10px;width:100%;min-height:40px;border-radius:10px;cursor:pointer;' +
+    'background:#F2705F;border:none;color:#2A0904;font-weight:800;font-size:13px">Recargar la app</button>';
+  d.querySelector('button').addEventListener('click', () => location.reload());
+  document.body.appendChild(d);
+}
+window.addEventListener('error', e => mostrarFalla('Error', (e.message || 'desconocido') + ' (línea ' + e.lineno + ')'));
+window.addEventListener('unhandledrejection', e => {
+  const r = e.reason;
+  mostrarFalla('Promesa', (r && (r.message || r)) || 'desconocido');
+});
+
 function isoLocal(d){
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
 }
@@ -402,7 +435,29 @@ montoEl.addEventListener('input', () => {
 
 // ---------- persistencia local + POST resiliente ----------
 function leerLS(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)) || []; }catch(e){ return []; } }
-function escribirLS(a){ localStorage.setItem(LS_KEY, JSON.stringify(a)); }
+
+// v9: escribir NUNCA puede tirar. Si el teléfono se queda sin espacio
+// (QuotaExceededError, iOS con poco disco) el botón "Guardar" se colgaba en
+// "Guardando…" para siempre y José no podía cargar nada. Ahora, si no entra,
+// se tiran los gastos VIEJOS YA SINCRONIZADOS (los que están en el servidor,
+// no se pierde nada) y se reintenta. Los pendientes no se tocan jamás.
+function escribirLS(a){
+  try{ localStorage.setItem(LS_KEY, JSON.stringify(a)); return true; }
+  catch(e){
+    try{
+      const pendientes = a.filter(x => x.estado === 'pendiente');
+      const sincronizados = a.filter(x => x.estado !== 'pendiente');
+      // se conservan los 30 sincronizados más nuevos, el resto ya vive en la DB
+      const podado = sincronizados.slice(-30).concat(pendientes);
+      localStorage.setItem(LS_KEY, JSON.stringify(podado));
+      toast('Se liberó espacio en el teléfono — tus gastos están a salvo', 'warn');
+      return true;
+    }catch(e2){
+      toast('El teléfono no tiene espacio para guardar acá — revisá que el gasto haya subido', 'error');
+      return false;
+    }
+  }
+}
 
 // Resiliencia de esquema: si a la DB le falta alguna columna nueva
 // (p.ej. `recurrente_meses` o `relevar` antes de correr SETUP-GASTOS-V6.sql),
@@ -652,6 +707,9 @@ async function abrirHistorial(force){
       return;
     }
   }
+  // Se pregunta UNA vez si el servidor sabe editar. Si falla la pregunta, no
+  // pasa nada: se dibuja igual, solo que sin lápices.
+  try{ await mantenimientoDisponible(); }catch(e){ mantenimientoOK = false; }
   try{ renderHistorial(); }
   catch(e){ cont.innerHTML = htmlFalla(e); }
   $('cambiar-clave-h').hidden = false;
@@ -680,14 +738,17 @@ function filaHTML(f, mapa){
   const thumb = f.foto_path
     ? '<button class="thumb" data-foto="' + esc(f.foto_path) + '" aria-label="Ver factura"><span>📷</span></button>' : '';
   const importe = (f.relevar && !Number(f.monto)) ? '$ —' : fmt$(montoEnt(f));
-  // v8: tocar la fila abre la hoja para corregirla o eliminarla.
+  // v9: el lápiz aparece SOLO si el servidor sabe editar (ver mantenimientoDisponible).
+  // Y se abre SOLO tocando el lápiz: tocar la fila entera hacía que, al
+  // recorrer el historial con el pulgar, saltara la hoja de edición encima
+  // de todo y pareciera que la app se trababa.
   const edita = editable(f);
   const k = claveFila(f);
   const lapiz = edita
-    ? '<button class="ed-lapiz" aria-label="Editar ' + esc(f.descripcion || 'gasto') + '">✏️</button>' : '';
+    ? '<button class="ed-lapiz" data-k="' + esc(k) + '" aria-label="Editar ' + esc(f.descripcion || 'gasto') + '">✏️</button>' : '';
   const cls = 'gasto gasto--sinavatar gasto--' + cat +
               (thumb ? ' gasto--conthumb' : '') + (edita ? ' gasto--editable' : '');
-  return '<div class="' + cls + '"' + (edita ? ' data-k="' + esc(k) + '"' : '') + '>' +
+  return '<div class="' + cls + '">' +
     '<div class="info"><div class="desc">' + esc(f.descripcion || '(sin detalle)') + '</div>' +
     '<div class="meta">' + badge + extra + neg + rec + rev + cola + '</div></div>' +
     thumb +
@@ -741,11 +802,8 @@ function renderHistorial(){
     cargarThumb(el);
     el.addEventListener('click', e => { e.stopPropagation(); verFoto(el.dataset.foto); });
   });
-  cont.querySelectorAll('.gasto[data-k]').forEach(el => {
-    el.addEventListener('click', e => {
-      if(e.target.closest('[data-foto]')) return;   // la foto es su propio botón
-      abrirEditor(el.dataset.k);
-    });
+  cont.querySelectorAll('.ed-lapiz[data-k]').forEach(el => {
+    el.addEventListener('click', e => { e.stopPropagation(); abrirEditor(el.dataset.k); });
   });
 }
 
@@ -814,16 +872,22 @@ function proyectar(filas){
     const base = idx(fy, fm - 1);
     const etiqueta = f.descripcion || '(sin detalle)';
     const esCredito = f.metodo === 'credito';
-    if(f.es_recurrente && !esCredito){
+    // v9 — FIX: un gasto que SE REPITE se proyecta todos los meses, se pague
+    // como se pague. Antes la condición era `f.es_recurrente && !esCredito`:
+    // si la suscripción estaba en tarjeta (que es lo normal — Claude Pro,
+    // publicidad de Marketplace, Netflix), ganaba la rama de crédito, se
+    // proyectaba UNA sola cuota y al mes siguiente desaparecía del
+    // "Comprometido". Por eso José no veía sus fijos en la proyección.
+    if(f.es_recurrente){
       const N = Number(f.recurrente_meses) || 0;   // 0 = sin fin
       for(let k = Math.max(0, base + 1); k < meses.length; k++){
         const nro = k - base + 1;                  // el gasto original fue el pago 1
         if(N && nro > N) break;
-        meses[k].items.push({t: etiqueta, sub: METODO_TXT[f.metodo] || f.metodo,
+        meses[k].items.push({t: etiqueta,
+                             sub: esCredito ? (f.tarjeta || 'Crédito') : (METODO_TXT[f.metodo] || f.metodo),
                              rec:true, cuota: N ? nro + '/' + N : null, v: montoEnt(f)});
       }
-    }
-    if(esCredito){
+    } else if(esCredito){
       const n = Math.max(1, Number(f.cuotas) || 1);
       const cuota = montoEnt(f) / n;
       for(let i = 1; i <= n; i++){
@@ -1009,8 +1073,34 @@ const claveFila = f => f._pendiente ? 'L' + f.local_id : 'S:' + f.id;
 const numE = v => Number(v) || 0;
 const esRpcQueNoExiste = (status, msg) => status === 404 || /PGRST20[25]|Could not find/i.test(msg || '');
 
+// v9 — DETECCIÓN DE CAPACIDAD.
+// El problema real de v8: la app mostraba el lápiz en TODAS las filas y
+// prometía "editar / eliminar" aunque el SQL v8 no estuviera corrido en la
+// base. Recién después de llenar el formulario y tocar Guardar avisaba que
+// no. Ahora se pregunta UNA vez y, si el servidor no sabe editar, la app
+// simplemente no ofrece editar: se comporta igual que antes de v8.
+//   null = todavía no se preguntó · true = hay RPC · false = no hay
+let mantenimientoOK = null;
+async function mantenimientoDisponible(){
+  if(mantenimientoOK !== null) return mantenimientoOK;
+  try{
+    // fila_id 0 no existe nunca: si la función está, contesta 0 filas tocadas.
+    const r = await fetch(SUPABASE_URL + '/rest/v1/rpc/' + RPC_ED, {
+      method:'POST', headers:{...H, 'Content-Type':'application/json'},
+      body: JSON.stringify({clave: localStorage.getItem(CLAVE_KEY), fila_id: 0}),
+    });
+    let txt = ''; try{ txt = await r.text(); }catch(e){}
+    mantenimientoOK = !esRpcQueNoExiste(r.status, txt);
+  }catch(e){
+    mantenimientoOK = false;   // sin señal: no prometemos lo que no podemos cumplir
+  }
+  return mantenimientoOK;
+}
+
 function editable(f){
+  // En cola = todavía está en el teléfono: se corrige acá, sin servidor.
   if(f._pendiente) return !!f.local_id;
+  if(mantenimientoOK === false) return false;   // el server todavía no sabe editar
   return f.id != null && isFinite(numE(f.id));
 }
 
