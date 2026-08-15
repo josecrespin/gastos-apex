@@ -114,14 +114,9 @@
   </footer>
 </main>
 
-<!-- ============ GATE DE CLAVE (compartido) ============ -->
-<main id="vista-gate" hidden>
-  <div class="gate">
-    <p>Tu clave para ver tus números (una sola vez):</p>
-    <input id="clave-input" class="field" type="text" autocomplete="off" placeholder="clave">
-    <button id="clave-ok" class="btn-primary">Entrar</button>
-  </div>
-</main>
+<!-- v10: NO HAY GATE DE CLAVE. José entra directo y no se le pide nunca más.
+     La clave de lectura viaja embebida en el código y se manda sola a la RPC
+     (igual que en /agus/ y /facu/). -->
 
 <!-- ============ HISTORIAL ============ -->
 <main id="vista-historial" hidden>
@@ -141,7 +136,6 @@
   </div>
   <p class="hist-stats" id="hist-stats"></p>
   <div id="hist-lista"></div>
-  <button class="cambiar-clave" id="cambiar-clave-h" hidden>cambiar clave</button>
 </main>
 
 <!-- ============ RESUMEN ============ -->
@@ -149,7 +143,6 @@
   <div class="seccion"><h2>Resumen</h2><button class="accion" id="refrescar-res">↻ Actualizar</button></div>
   <div id="res-contenido"></div>
   <p class="pie" id="actualizado"></p>
-  <button class="cambiar-clave" id="cambiar-clave-r" hidden>cambiar clave</button>
 </main>
 
 <!-- ============ TABBAR ============ -->
@@ -249,8 +242,18 @@ const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsI
 const TABLA = 'gastos_jose';
 const RPC_LISTA = 'gastos_jose_lista';
 const LS_KEY = 'gastos_jose_v1';
-const CLAVE_KEY = 'gastos_jose_clave';
+// v10 — SIN CLAVE. La clave de lectura de gastos_jose viaja acá y se manda
+// sola. El backend la sigue exigiendo (RLS insert-only + RPC con clave), pero
+// el que la tipeaba era José, en su propia app. Con esta clave es imposible
+// tocar la obra ni lo de sus hermanos. La clave MAESTRA no está en este
+// código, a propósito.
+const CLAVE_PERSONAL = 'fbb7f15ec1';
+const LS_CLAVE_VIEJA = 'gastos_jose_clave';   // solo para limpiarla
 const H = {'apikey': ANON_KEY, 'Authorization': 'Bearer ' + ANON_KEY};
+
+// Higiene: si el teléfono guardó la clave cuando existía el portón, se borra.
+// No queda ninguna ruta de código que lea esto para decidir si mostrar algo.
+try{ localStorage.removeItem(LS_CLAVE_VIEJA); }catch(e){}
 
 const METODO_TXT = {efectivo:'Efectivo', transferencia:'Transferencia', debito:'Débito', credito:'Crédito'};
 const CAT_TXT = {personal:'Personal', negocio:'Negocio'};
@@ -611,11 +614,10 @@ $('exportar').addEventListener('click', () => {
 let filasCache = null;
 async function traerFilas(force){
   if(filasCache && !force) return filasCache;
-  const clave = localStorage.getItem(CLAVE_KEY);
   const r = await fetch(SUPABASE_URL + '/rest/v1/rpc/' + RPC_LISTA, {
     method:'POST',
     headers:{...H, 'Content-Type':'application/json'},
-    body: JSON.stringify({clave}),
+    body: JSON.stringify({clave: CLAVE_PERSONAL}),
   });
   if(!r.ok) throw new Error('server');
   const filas = await r.json();
@@ -636,40 +638,21 @@ function mapaCategoriasLocal(){
 const categoriaDe = (f, mapa) => f.categoria || (f.local_id && mapa[f.local_id]) || 'personal';
 
 // ---------- vistas ----------
-let destinoConClave = 'historial';
+// v10: tres vistas y nada más. No existe 'gate' ni pedirVista(): tocar
+// Historial o Resumen entra directo, siempre.
 function setVista(v){
-  ['cargar','gate','historial','resumen'].forEach(x => { $('vista-' + x).hidden = x !== v; });
+  ['cargar','historial','resumen'].forEach(x => { $('vista-' + x).hidden = x !== v; });
   $('tab-cargar').classList.toggle('act', v === 'cargar');
-  $('tab-historial').classList.toggle('act', v === 'historial' || (v === 'gate' && destinoConClave === 'historial'));
-  $('tab-resumen').classList.toggle('act', v === 'resumen' || (v === 'gate' && destinoConClave === 'resumen'));
+  $('tab-historial').classList.toggle('act', v === 'historial');
+  $('tab-resumen').classList.toggle('act', v === 'resumen');
   if(v === 'historial') abrirHistorial();
   if(v === 'resumen') abrirResumen();
 }
-function pedirVista(v){
-  if((v === 'historial' || v === 'resumen') && !localStorage.getItem(CLAVE_KEY)){
-    destinoConClave = v; setVista('gate'); return;
-  }
-  setVista(v);
-}
 $('tab-cargar').addEventListener('click', () => setVista('cargar'));
-$('tab-historial').addEventListener('click', () => pedirVista('historial'));
-$('tab-resumen').addEventListener('click', () => pedirVista('resumen'));
+$('tab-historial').addEventListener('click', () => setVista('historial'));
+$('tab-resumen').addEventListener('click', () => setVista('resumen'));
 $('refrescar-hist').addEventListener('click', () => abrirHistorial(true));
 $('refrescar-res').addEventListener('click', () => abrirResumen(true));
-
-$('clave-ok').addEventListener('click', () => {
-  const v = $('clave-input').value.trim();
-  if(!v) return;
-  localStorage.setItem(CLAVE_KEY, v);
-  setVista(destinoConClave);
-});
-function olvidarClave(destino){
-  localStorage.removeItem(CLAVE_KEY);
-  filasCache = null;
-  pedirVista(destino);
-}
-$('cambiar-clave-h').addEventListener('click', () => olvidarClave('historial'));
-$('cambiar-clave-r').addEventListener('click', () => olvidarClave('resumen'));
 
 // Red de seguridad: si el dibujado falla, se muestra el motivo en pantalla
 // en vez de dejar el "Cargando…" para siempre.
@@ -697,7 +680,6 @@ initFiltro('filtro-metodo','metodo');
 
 async function abrirHistorial(force){
   const cont = $('hist-lista');
-  $('cambiar-clave-h').hidden = true;
   if(!filasCache || force){
     cont.innerHTML = '<div class="vacio">Cargando…</div>';
     $('hist-stats').textContent = '';
@@ -712,7 +694,6 @@ async function abrirHistorial(force){
   try{ await mantenimientoDisponible(); }catch(e){ mantenimientoOK = false; }
   try{ renderHistorial(); }
   catch(e){ cont.innerHTML = htmlFalla(e); }
-  $('cambiar-clave-h').hidden = false;
 }
 
 function coincide(f, mapa){
@@ -782,7 +763,7 @@ function renderHistorial(){
   if(!filtradas.length){
     cont.innerHTML = filasCache.length || pendientes.length
       ? '<div class="vacio"><b>Nada con ese filtro</b>Probá con otra búsqueda.</div>'
-      : '<div class="vacio"><b>Sin datos</b>¿La clave está bien?</div>';
+      : '<div class="vacio"><b>Todavía no cargaste nada</b>Cargá tu primer gasto desde la pestaña Cargar.</div>';
     return;
   }
 
@@ -834,7 +815,6 @@ $('foto-overlay').addEventListener('click', () => $('foto-overlay').classList.re
 // ---------- RESUMEN ----------
 async function abrirResumen(force){
   const cont = $('res-contenido');
-  $('cambiar-clave-r').hidden = true;
   $('actualizado').textContent = '';
   if(!filasCache || force){
     cont.innerHTML = '<div class="vacio">Cargando…</div>';
@@ -845,13 +825,11 @@ async function abrirResumen(force){
     }
   }
   if(!filasCache.length){
-    cont.innerHTML = '<div class="vacio"><b>Sin datos</b>¿La clave está bien?</div>';
-    $('cambiar-clave-r').hidden = false;
+    cont.innerHTML = '<div class="vacio"><b>Todavía no cargaste nada</b>Cargá tu primer gasto desde la pestaña Cargar.</div>';
     return;
   }
   try{ renderResumen(filasCache); }
-  catch(e){ cont.innerHTML = htmlFalla(e); $('cambiar-clave-r').hidden = false; return; }
-  $('cambiar-clave-r').hidden = false;
+  catch(e){ cont.innerHTML = htmlFalla(e); return; }
   $('actualizado').textContent = 'Actualizado ' + new Date().toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'});
 }
 
@@ -1087,7 +1065,7 @@ async function mantenimientoDisponible(){
     // fila_id 0 no existe nunca: si la función está, contesta 0 filas tocadas.
     const r = await fetch(SUPABASE_URL + '/rest/v1/rpc/' + RPC_ED, {
       method:'POST', headers:{...H, 'Content-Type':'application/json'},
-      body: JSON.stringify({clave: localStorage.getItem(CLAVE_KEY), fila_id: 0}),
+      body: JSON.stringify({clave: CLAVE_PERSONAL, fila_id: 0}),
     });
     let txt = ''; try{ txt = await r.text(); }catch(e){}
     mantenimientoOK = !esRpcQueNoExiste(r.status, txt);
@@ -1309,7 +1287,7 @@ $('ed-guardar').addEventListener('click', async () => {
   const enCola = !!f._pendiente;
   const res = enCola
     ? editarEnCola(f, c)
-    : await rpcMant(RPC_ED, {clave: localStorage.getItem(CLAVE_KEY), fila_id: f.id, ...c});
+    : await rpcMant(RPC_ED, {clave: CLAVE_PERSONAL, fila_id: f.id, ...c});
   await terminarEd(res, '✓ Cambios guardados', enCola);
 });
 
@@ -1330,7 +1308,7 @@ $('ed-si').addEventListener('click', async () => {
   $('ed-si').disabled = true; $('ed-si').textContent = 'Borrando…';
   const res = enCola
     ? borrarDeCola(f)
-    : await rpcMant(RPC_BO, {clave: localStorage.getItem(CLAVE_KEY), fila_id: f.id});
+    : await rpcMant(RPC_BO, {clave: CLAVE_PERSONAL, fila_id: f.id});
   if(!res.n || res.compat || res.error){       // no se borró: vuelve el botón
     $('ed-confirmar').hidden = true; $('ed-borrar').hidden = false;
   }
@@ -1338,8 +1316,8 @@ $('ed-si').addEventListener('click', async () => {
 });
 
 // ---------- arranque ----------
-if(location.hash === '#historial') pedirVista('historial');
-if(location.hash === '#resumen' || location.hash === '#proximos') pedirVista('resumen');
+if(location.hash === '#historial') setVista('historial');
+if(location.hash === '#resumen' || location.hash === '#proximos') setVista('resumen');
 reintentarPendientes(false);
 refrescarPendientes();
 // Si el navegador no deja registrar el worker (modo incógnito, política del

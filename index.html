@@ -123,14 +123,9 @@
   </footer>
 </main>
 
-<!-- ============ GATE DE CLAVE (compartido) ============ -->
-<main id="vista-gate" hidden>
-  <div class="gate">
-    <p>Clave familiar (una sola vez):</p>
-    <input id="clave-input" class="field" type="text" autocomplete="off" placeholder="clave">
-    <button id="clave-ok" class="btn-primary">Entrar</button>
-  </div>
-</main>
+<!-- v10: NO HAY GATE DE CLAVE. Los tres hermanos usan la misma app y entran
+     directo. La clave de lectura viaja embebida en el código y se manda sola
+     a la RPC (igual que en /agus/ y /facu/). Nadie tipea nada nunca más. -->
 
 <!-- ============ HISTORIAL ============ -->
 <main id="vista-historial" hidden>
@@ -149,7 +144,6 @@
   </div>
   <p class="hist-stats" id="hist-stats"></p>
   <div id="hist-lista"></div>
-  <button class="cambiar-clave" id="cambiar-clave-h" hidden>cambiar clave</button>
 </main>
 
 <!-- ============ RESUMEN ============ -->
@@ -157,7 +151,6 @@
   <div class="seccion"><h2>Resumen</h2><button class="accion" id="refrescar-res">↻ Actualizar</button></div>
   <div id="res-contenido"></div>
   <p class="pie" id="actualizado"></p>
-  <button class="cambiar-clave" id="cambiar-clave-r" hidden>cambiar clave</button>
 </main>
 
 <!-- ============ TABBAR ============ -->
@@ -266,8 +259,18 @@ const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsI
 const TABLA = 'gastos_obras';
 const RPC_LISTA = 'gastos_obras_lista';
 const LS_KEY = 'gastos_obras_v1';
-const CLAVE_KEY = 'gastos_obras_clave';
+// v10 — SIN CLAVE. La clave de lectura de la obra viaja acá y se manda sola.
+// El backend la sigue exigiendo (RLS insert-only + RPC con clave), pero el
+// que la tipeaba era José. Es la MISMA que ya llevan embebida /agus/ y
+// /facu/, así que esto no abre ninguna puerta nueva. La clave MAESTRA (la que
+// puede borrar tablas enteras) NO está en este código, a propósito.
+const CLAVE_OBRAS = '66db2f50ca';
+const LS_CLAVE_VIEJA = 'gastos_obras_clave';   // solo para limpiarla
 const H = {'apikey': ANON_KEY, 'Authorization': 'Bearer ' + ANON_KEY};
+
+// Higiene: si el teléfono guardó la clave cuando existía el portón, se borra.
+// No queda ninguna ruta de código que lea esto para decidir si mostrar algo.
+try{ localStorage.removeItem(LS_CLAVE_VIEJA); }catch(e){}
 
 const NOMBRES = {jose:'José', facu:'Facu', agus:'Agus'};
 const INICIAL = {jose:'J', facu:'F', agus:'A'};
@@ -324,6 +327,39 @@ function toast(msg, tipo){
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove('show'), 3200);
 }
+
+// ============================================================
+// RED DE SEGURIDAD GLOBAL (v10)
+// ------------------------------------------------------------
+// Antes, CUALQUIER excepción suelta dejaba la app muda: los botones no
+// respondían, la consola quedaba limpia y desde afuera era imposible saber
+// qué pasó ("no funciona nada"). Ahora todo error visible se muestra en
+// pantalla con el detalle, así se le puede sacar una foto y mandarla.
+// Regla: la app avisa, nunca se muere en silencio.
+let errVisto = false;
+function mostrarFalla(origen, detalle){
+  if(errVisto) return;          // un solo cartel; no tapar la app con diez
+  errVisto = true;
+  const d = document.createElement('div');
+  d.id = 'falla-global';
+  d.setAttribute('role','alert');
+  d.style.cssText = 'position:fixed;left:12px;right:12px;bottom:96px;z-index:200;' +
+    'background:#3A1410;border:1.5px solid #F2705F;border-radius:14px;padding:14px 16px;' +
+    'color:#FFE9E4;font:600 13px -apple-system,BlinkMacSystemFont,system-ui,sans-serif;' +
+    'box-shadow:0 12px 32px -8px rgba(0,0,0,.7)';
+  d.innerHTML = '<b style="display:block;font-size:14px;margin-bottom:4px">Algo falló en la app</b>' +
+    '<span style="display:block;opacity:.85;word-break:break-word">' + esc(origen + ': ' + detalle) + '</span>' +
+    '<span style="display:block;margin-top:8px;opacity:.7">Mandale esta captura a Jarvis.</span>' +
+    '<button style="margin-top:10px;width:100%;min-height:40px;border-radius:10px;cursor:pointer;' +
+    'background:#F2705F;border:none;color:#2A0904;font-weight:800;font-size:13px">Recargar la app</button>';
+  d.querySelector('button').addEventListener('click', () => location.reload());
+  document.body.appendChild(d);
+}
+window.addEventListener('error', e => mostrarFalla('Error', (e.message || 'desconocido') + ' (línea ' + e.lineno + ')'));
+window.addEventListener('unhandledrejection', e => {
+  const r = e.reason;
+  mostrarFalla('Promesa', (r && (r.message || r)) || 'desconocido');
+});
 
 function isoLocal(d){
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
@@ -447,7 +483,29 @@ montoEl.addEventListener('input', () => {
 
 // ---------- persistencia local + POST con anti-duplicados ----------
 function leerLS(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)) || []; }catch(e){ return []; } }
-function escribirLS(a){ localStorage.setItem(LS_KEY, JSON.stringify(a)); }
+
+// v10: escribir NUNCA puede tirar. Si el teléfono se queda sin espacio
+// (QuotaExceededError, iOS con poco disco) el botón "Guardar" se colgaba en
+// "Guardando…" para siempre y no se podía cargar nada. Ahora, si no entra,
+// se tiran los gastos VIEJOS YA SINCRONIZADOS (los que están en el servidor,
+// no se pierde nada) y se reintenta. Los pendientes no se tocan jamás.
+function escribirLS(a){
+  try{ localStorage.setItem(LS_KEY, JSON.stringify(a)); return true; }
+  catch(e){
+    try{
+      const pendientes = a.filter(x => x.estado === 'pendiente');
+      const sincronizados = a.filter(x => x.estado !== 'pendiente');
+      // se conservan los 30 sincronizados más nuevos, el resto ya vive en la DB
+      const podado = sincronizados.slice(-30).concat(pendientes);
+      localStorage.setItem(LS_KEY, JSON.stringify(podado));
+      toast('Se liberó espacio en el teléfono — tus gastos están a salvo', 'warn');
+      return true;
+    }catch(e2){
+      toast('El teléfono no tiene espacio para guardar acá — revisá que el gasto haya subido', 'error');
+      return false;
+    }
+  }
+}
 
 // Anti-duplicados: cada gasto viaja con un local_id único (índice UNIQUE en
 // la DB). Si el teléfono reintenta un envío que ya había llegado, la base
@@ -601,11 +659,10 @@ $('exportar').addEventListener('click', () => {
 let filasCache = null;
 async function traerFilas(force){
   if(filasCache && !force) return filasCache;
-  const clave = localStorage.getItem(CLAVE_KEY);
   const r = await fetch(SUPABASE_URL + '/rest/v1/rpc/' + RPC_LISTA, {
     method:'POST',
     headers:{...H, 'Content-Type':'application/json'},
-    body: JSON.stringify({clave}),
+    body: JSON.stringify({clave: CLAVE_OBRAS}),
   });
   if(!r.ok) throw new Error('server');
   const filas = await r.json();
@@ -617,40 +674,21 @@ async function traerFilas(force){
 }
 
 // ---------- vistas ----------
-let destinoConClave = 'historial';
+// v10: tres vistas y nada más. No existe 'gate' ni pedirVista(): tocar
+// Historial o Resumen entra directo, siempre.
 function setVista(v){
-  ['cargar','gate','historial','resumen'].forEach(x => { $('vista-' + x).hidden = x !== v; });
+  ['cargar','historial','resumen'].forEach(x => { $('vista-' + x).hidden = x !== v; });
   $('tab-cargar').classList.toggle('act', v === 'cargar');
-  $('tab-historial').classList.toggle('act', v === 'historial' || (v === 'gate' && destinoConClave === 'historial'));
-  $('tab-resumen').classList.toggle('act', v === 'resumen' || (v === 'gate' && destinoConClave === 'resumen'));
+  $('tab-historial').classList.toggle('act', v === 'historial');
+  $('tab-resumen').classList.toggle('act', v === 'resumen');
   if(v === 'historial') abrirHistorial();
   if(v === 'resumen') abrirResumen();
 }
-function pedirVista(v){
-  if((v === 'historial' || v === 'resumen') && !localStorage.getItem(CLAVE_KEY)){
-    destinoConClave = v; setVista('gate'); return;
-  }
-  setVista(v);
-}
 $('tab-cargar').addEventListener('click', () => setVista('cargar'));
-$('tab-historial').addEventListener('click', () => pedirVista('historial'));
-$('tab-resumen').addEventListener('click', () => pedirVista('resumen'));
+$('tab-historial').addEventListener('click', () => setVista('historial'));
+$('tab-resumen').addEventListener('click', () => setVista('resumen'));
 $('refrescar-hist').addEventListener('click', () => abrirHistorial(true));
 $('refrescar-res').addEventListener('click', () => abrirResumen(true));
-
-$('clave-ok').addEventListener('click', () => {
-  const v = $('clave-input').value.trim();
-  if(!v) return;
-  localStorage.setItem(CLAVE_KEY, v);
-  setVista(destinoConClave);
-});
-function olvidarClave(destino){
-  localStorage.removeItem(CLAVE_KEY);
-  filasCache = null;
-  pedirVista(destino);
-}
-$('cambiar-clave-h').addEventListener('click', () => olvidarClave('historial'));
-$('cambiar-clave-r').addEventListener('click', () => olvidarClave('resumen'));
 
 // Red de seguridad: si el dibujado falla, se muestra el motivo en pantalla
 // en vez de dejar el "Cargando…" para siempre.
@@ -678,7 +716,6 @@ initFiltro('filtro-proyecto','proyecto');
 
 async function abrirHistorial(force){
   const cont = $('hist-lista');
-  $('cambiar-clave-h').hidden = true;
   if(!filasCache || force){
     cont.innerHTML = '<div class="vacio">Cargando…</div>';
     $('hist-stats').textContent = '';
@@ -688,9 +725,11 @@ async function abrirHistorial(force){
       return;
     }
   }
+  // Se pregunta UNA vez si el servidor sabe editar. Si falla la pregunta, no
+  // pasa nada: se dibuja igual, solo que sin lápices.
+  try{ await mantenimientoDisponible(); }catch(e){ mantenimientoOK = false; }
   try{ renderHistorial(); }
   catch(e){ cont.innerHTML = htmlFalla(e); }
-  $('cambiar-clave-h').hidden = false;
 }
 
 function coincide(f){
@@ -714,14 +753,17 @@ function filaHTML(f){
   const thumb = f.foto_path
     ? '<button class="thumb" data-foto="' + esc(f.foto_path) + '" aria-label="Ver factura"><span>📷</span></button>' : '';
   const importe = (f.relevar && !Number(f.monto)) ? '$ —' : fmt$(montoEnt(f));
-  // v8: tocar la fila abre la hoja para corregirla o eliminarla.
+  // v10: el lápiz aparece SOLO si el servidor sabe editar (ver
+  // mantenimientoDisponible). Y la hoja se abre SOLO tocando el lápiz: tocar
+  // la fila entera hacía que, al recorrer el historial con el pulgar, saltara
+  // la hoja de edición encima de todo y pareciera que la app se trababa.
   const edita = editable(f);
   const k = claveFila(f);
   const lapiz = edita
-    ? '<button class="ed-lapiz" aria-label="Editar ' + esc(f.descripcion || 'gasto') + '">✏️</button>' : '';
+    ? '<button class="ed-lapiz" data-k="' + esc(k) + '" aria-label="Editar ' + esc(f.descripcion || 'gasto') + '">✏️</button>' : '';
   const cls = 'gasto gasto--' + (PROY_CLASE[f.proyecto] || 'obra') +
               (thumb ? ' gasto--conthumb' : '') + (edita ? ' gasto--editable' : '');
-  return '<div class="' + cls + '"' + (edita ? ' data-k="' + esc(k) + '"' : '') + '>' +
+  return '<div class="' + cls + '">' +
     '<div class="avatar avatar--' + esc(f.quien) + '">' + (INICIAL[f.quien] || '?') + '</div>' +
     '<div class="info"><div class="desc">' + esc(f.descripcion || '(sin detalle)') + '</div>' +
     '<div class="meta">' + badge + extra + rec + rev + cola + '</div></div>' +
@@ -756,7 +798,7 @@ function renderHistorial(){
   if(!filtradas.length){
     cont.innerHTML = filasCache.length || pendientes.length
       ? '<div class="vacio"><b>Nada con ese filtro</b>Probá con otra búsqueda.</div>'
-      : '<div class="vacio"><b>Sin datos</b>¿La clave está bien?</div>';
+      : '<div class="vacio"><b>Todavía no hay gastos de obra</b>Cargá el primero desde la pestaña Cargar.</div>';
     return;
   }
 
@@ -776,11 +818,8 @@ function renderHistorial(){
     cargarThumb(el);
     el.addEventListener('click', e => { e.stopPropagation(); verFoto(el.dataset.foto); });
   });
-  cont.querySelectorAll('.gasto[data-k]').forEach(el => {
-    el.addEventListener('click', e => {
-      if(e.target.closest('[data-foto]')) return;   // la foto es su propio botón
-      abrirEditor(el.dataset.k);
-    });
+  cont.querySelectorAll('.ed-lapiz[data-k]').forEach(el => {
+    el.addEventListener('click', e => { e.stopPropagation(); abrirEditor(el.dataset.k); });
   });
 }
 
@@ -811,7 +850,6 @@ $('foto-overlay').addEventListener('click', () => $('foto-overlay').classList.re
 // ---------- RESUMEN ----------
 async function abrirResumen(force){
   const cont = $('res-contenido');
-  $('cambiar-clave-r').hidden = true;
   $('actualizado').textContent = '';
   if(!filasCache || force){
     cont.innerHTML = '<div class="vacio">Cargando…</div>';
@@ -822,20 +860,19 @@ async function abrirResumen(force){
     }
   }
   if(!filasCache.length){
-    cont.innerHTML = '<div class="vacio"><b>Sin datos</b>¿La clave está bien?</div>';
-    $('cambiar-clave-r').hidden = false;
+    cont.innerHTML = '<div class="vacio"><b>Todavía no hay gastos de obra</b>Cargá el primero desde la pestaña Cargar.</div>';
     return;
   }
   try{ renderResumen(filasCache); }
-  catch(e){ cont.innerHTML = htmlFalla(e); $('cambiar-clave-r').hidden = false; return; }
-  $('cambiar-clave-r').hidden = false;
+  catch(e){ cont.innerHTML = htmlFalla(e); return; }
   $('actualizado').textContent = 'Actualizado ' + new Date().toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'});
 }
 
 // Regla: TODA compra a crédito impacta los meses siguientes (aun en 1 cuota).
 // Recurrentes (v4): respetan el horizonte elegido — N meses en total (el
 // gasto cargado cuenta como pago 1) o sin fin si no se puso límite.
-// Crédito + recurrente: manda el crédito (sin doble conteo).
+// v10 — Crédito + recurrente: manda EL RECURRENTE (antes mandaba el crédito
+// y por eso los fijos pagados con tarjeta desaparecían de la proyección).
 function proyectar(filas){
   const hoy = new Date();
   const meses = [];
@@ -850,16 +887,22 @@ function proyectar(filas){
     const etiqueta = f.descripcion || '(sin detalle)';
     const sub = (NOMBRES[f.quien] || f.quien) + ' · ' + (PROYECTOS[f.proyecto] || f.proyecto);
     const esCredito = f.metodo === 'credito';
-    if(f.es_recurrente && !esCredito){
+    // v10 — FIX: un gasto que SE REPITE se proyecta todos los meses, se pague
+    // como se pague. Antes la condición era `f.es_recurrente && !esCredito`:
+    // si el fijo estaba en tarjeta (que es lo normal), ganaba la rama de
+    // crédito, se proyectaba UNA sola cuota y al mes siguiente desaparecía
+    // del "Comprometido".
+    if(f.es_recurrente){
       const N = Number(f.recurrente_meses) || 0;   // 0 = sin fin
       for(let k = Math.max(0, base + 1); k < meses.length; k++){
         const nro = k - base + 1;                  // el gasto original fue el pago 1
         if(N && nro > N) break;
-        meses[k].items.push({t: etiqueta, sub, rec:true,
+        meses[k].items.push({t: etiqueta,
+                             sub: esCredito ? (sub + ' · ' + (f.tarjeta || 'Crédito')) : sub,
+                             rec:true,
                              cuota: N ? nro + '/' + N : null, v: montoEnt(f)});
       }
-    }
-    if(esCredito){
+    } else if(esCredito){
       const n = Math.max(1, Number(f.cuotas) || 1);
       const cuota = montoEnt(f) / n;
       for(let i = 1; i <= n; i++){
@@ -977,6 +1020,12 @@ function renderResumen(filas){
   html += '</div>';
 
   // CUÁNTO PUSO CADA UNO
+  // ----------------------------------------------------------------
+  // REGLA DE NEGOCIO (José, 15-ago-2026): la obra NO se divide en tres.
+  // Cada hermano invierte lo que puede y recupera SU aporte cuando el
+  // restaurante facture. Por eso acá no hay — ni puede haber — promedios,
+  // "te deben", saldos entre hermanos ni partes iguales: solo el total y
+  // el aporte acumulado de cada uno con su porcentaje real.
   const maxQuien = Math.max(...Object.values(porQuien), 1);
   html +=
     '<section class="card"><h3>Cuánto puso cada uno</h3><div class="bars">' +
@@ -984,9 +1033,14 @@ function renderResumen(filas){
       '<div class="bar-row bar-row--' + q + '">' +
         '<span class="quien">' + NOMBRES[q] + '</span>' +
         '<div class="bar-track"><div class="bar-fill" style="--w:' + ((porQuien[q] || 0) / maxQuien * 100).toFixed(1) + '%"></div></div>' +
-        '<span class="cuanto">' + fmt$(porQuien[q] || 0) + '</span>' +
+        '<span class="cuanto money">' + fmt$(porQuien[q] || 0) +
+          '<small style="display:block;font-weight:600;opacity:.6">' + pct(q).toFixed(1).replace('.', ',') + '%</small>' +
+        '</span>' +
       '</div>').join('') +
-    '</div></section>';
+    '</div>' +
+    '<p class="pie" style="margin-top:var(--sp-3);text-align:left">Cada uno invierte lo que puede — la obra no se divide en tres. ' +
+    'Lo que puso cada hermano lo recupera con la facturación del restaurante.</p>' +
+    '</section>';
 
   // GASTO POR MES (SVG propio)
   html += '<section class="card"><h3>Gasto por mes</h3>' + chartMeses(filas, '#C98F5F') + '</section>';
@@ -1041,8 +1095,34 @@ const claveFila = f => f._pendiente ? 'L' + f.local_id : 'S:' + f.id;
 const numE = v => Number(v) || 0;
 const esRpcQueNoExiste = (status, msg) => status === 404 || /PGRST20[25]|Could not find/i.test(msg || '');
 
+// v10 — DETECCIÓN DE CAPACIDAD.
+// El problema real de v8: la app mostraba el lápiz en TODAS las filas y
+// prometía "editar / eliminar" aunque el SQL v8 no estuviera corrido en la
+// base. Recién después de llenar el formulario y tocar Guardar avisaba que
+// no. Ahora se pregunta UNA vez y, si el servidor no sabe editar, la app
+// simplemente no ofrece editar: se comporta igual que antes de v8.
+//   null = todavía no se preguntó · true = hay RPC · false = no hay
+let mantenimientoOK = null;
+async function mantenimientoDisponible(){
+  if(mantenimientoOK !== null) return mantenimientoOK;
+  try{
+    // fila_id 0 no existe nunca: si la función está, contesta 0 filas tocadas.
+    const r = await fetch(SUPABASE_URL + '/rest/v1/rpc/' + RPC_ED, {
+      method:'POST', headers:{...H, 'Content-Type':'application/json'},
+      body: JSON.stringify({clave: CLAVE_OBRAS, quien: 'jose', fila_id: 0}),
+    });
+    let txt = ''; try{ txt = await r.text(); }catch(e){}
+    mantenimientoOK = !esRpcQueNoExiste(r.status, txt);
+  }catch(e){
+    mantenimientoOK = false;   // sin señal: no prometemos lo que no podemos cumplir
+  }
+  return mantenimientoOK;
+}
+
 function editable(f){
+  // En cola = todavía está en el teléfono: se corrige acá, sin servidor.
   if(f._pendiente) return !!f.local_id;
+  if(mantenimientoOK === false) return false;   // el server todavía no sabe editar
   return f.id != null && isFinite(numE(f.id));
 }
 
@@ -1269,7 +1349,7 @@ $('ed-guardar').addEventListener('click', async () => {
   const enCola = !!f._pendiente;
   const res = enCola
     ? editarEnCola(f, c)
-    : await rpcMant(RPC_ED, {clave: localStorage.getItem(CLAVE_KEY), quien: o.quien, fila_id: f.id, ...c});
+    : await rpcMant(RPC_ED, {clave: CLAVE_OBRAS, quien: o.quien, fila_id: f.id, ...c});
   await terminarEd(res, '✓ Cambios guardados', enCola);
 });
 
@@ -1290,7 +1370,7 @@ $('ed-si').addEventListener('click', async () => {
   $('ed-si').disabled = true; $('ed-si').textContent = 'Borrando…';
   const res = enCola
     ? borrarDeCola(f)
-    : await rpcMant(RPC_BO, {clave: localStorage.getItem(CLAVE_KEY), quien: o.quien, fila_id: f.id});
+    : await rpcMant(RPC_BO, {clave: CLAVE_OBRAS, quien: o.quien, fila_id: f.id});
   if(!res.n || res.compat || res.error){       // no se borró: vuelve el botón
     $('ed-confirmar').hidden = true; $('ed-borrar').hidden = false;
   }
@@ -1298,8 +1378,8 @@ $('ed-si').addEventListener('click', async () => {
 });
 
 // ---------- arranque ----------
-if(location.hash === '#historial') pedirVista('historial');
-if(location.hash === '#resumen' || location.hash === '#proximos') pedirVista('resumen');
+if(location.hash === '#historial') setVista('historial');
+if(location.hash === '#resumen' || location.hash === '#proximos') setVista('resumen');
 reintentarPendientes(false);
 refrescarPendientes();
 // Si el navegador no deja registrar el worker (modo incógnito, política del

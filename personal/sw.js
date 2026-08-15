@@ -1,7 +1,7 @@
 // Service worker de la app personal — NETWORK-FIRST para HTML/CSS:
 // José ve siempre la última versión apenas hay señal; el cache queda
 // como respaldo offline. Scope: /gastos-apex/personal/ (no toca obras).
-const CACHE = 'gastos-jose-v9';
+const CACHE = 'gastos-jose-v10';
 const SHELL = ['.', 'index.html', 'apex-sync.css', 'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {
