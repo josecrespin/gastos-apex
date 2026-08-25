@@ -240,6 +240,10 @@
 const SUPABASE_URL = 'https://kfiywiqivibktzakclyv.supabase.co';
 const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtmaXl3aXFpdmlia3R6YWtjbHl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyMTA1MTgsImV4cCI6MjA5ODc4NjUxOH0.Z1DQW5ySGolzrjsqeesg824cpctqa04BOS2RSH4NTNo';
 const TABLA = 'gastos_jose';
+
+// Crédito Caja Popular tomado el 24-ago-2026 (línea PAFPE).
+// Capital $9.997.327,46 − seguro, sellado y ajuste = $9.600.000 acreditados.
+const CREDITO = { neto: 9600000, cuota: 518548.80, desde: '2026-08-24' };
 const RPC_LISTA = 'gastos_jose_lista';
 const LS_KEY = 'gastos_jose_v1';
 // v10 — SIN CLAVE. La clave de lectura de gastos_jose viaja acá y se manda
@@ -965,6 +969,32 @@ function renderResumen(filas){
       '</div>';
   }
   html += '</section>';
+
+  // ===== CRÉDITO CAJA POPULAR =====
+  // Regla acordada con José (24-ago-2026): mientras dure el crédito, TODO lo que
+  // se paga en efectivo o por transferencia sale de ese pozo. Lo que se paga con
+  // tarjeta NO — eso se paga con el sueldo en el resumen siguiente.
+  const usadoCred = filas
+    .filter(f => f.fecha >= CREDITO.desde && (f.metodo === 'efectivo' || f.metodo === 'transferencia'))
+    .reduce((s, f) => s + montoEnt(f), 0);
+  const quedaCred = CREDITO.neto - usadoCred;
+  const pctCred = Math.max(0, Math.min(100, quedaCred / CREDITO.neto * 100));
+  const alertaCred = pctCred < 20 ? ' credito--rojo' : (pctCred < 45 ? ' credito--amarillo' : '');
+  html +=
+    '<section class="card credito' + alertaCred + '">' +
+      '<div class="credito-top">' +
+        '<h3>Crédito Caja Popular</h3>' +
+        '<span class="credito-cuota">48 cuotas de ' + fmt$(CREDITO.cuota) + '</span>' +
+      '</div>' +
+      '<div class="credito-queda money">' + fmt$(quedaCred) + '</div>' +
+      '<div class="credito-sub">disponible de ' + fmt$(CREDITO.neto) + '</div>' +
+      '<div class="credito-track"><div class="credito-fill" style="width:' + pctCred.toFixed(1) + '%"></div></div>' +
+      '<div class="credito-detalle">' +
+        '<span>Usado <b class="money">' + fmt$(usadoCred) + '</b></span>' +
+        '<span>' + Math.round(pctCred) + '% sin tocar</span>' +
+      '</div>' +
+      '<p class="credito-nota">Se descuenta todo lo que pagues en <b>efectivo o transferencia</b> desde el 24 de agosto. Lo que pagás con <b>tarjeta</b> no sale del crédito.</p>' +
+    '</section>';
 
   // STATS
   html += '<div class="stat-grid">' +
