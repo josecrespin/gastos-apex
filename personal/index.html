@@ -244,7 +244,30 @@ const TABLA = 'gastos_jose';
 // Crédito Caja Popular tomado el 24-ago-2026 (línea PAFPE).
 // Capital $9.997.327,46 − seguro, sellado y ajuste = $9.600.000 acreditados.
 const CREDITO = { neto: 9600000, cuota: 518548.80, desde: '2026-08-24' };
-const CLAVE_OBRAS_LECTURA = '66db2f50ca';   // solo lectura, la misma de la app de obras
+// 0152 (14-oct-2026) — CLAVE POR PERSONA. La clave ya NO está en el código:
+// este HTML es público y cualquiera la leía. Se pide UNA vez por teléfono y
+// queda guardada acá. Si el servidor la rechaza (403) se borra y se vuelve a pedir.
+// Cada uno tiene la suya (José, Agus, Facu): abre la obra y lo propio.
+const LS_MI_CLAVE = 'gastos_apex_mi_clave';
+function leerMiClave(){
+  let k = '';
+  try{ k = localStorage.getItem(LS_MI_CLAVE) || ''; }catch(e){}
+  while(!k){
+    const t = window.prompt('Escribí tu clave de la app de gastos (te la pasa José). Se pide una sola vez.');
+    if(t === null) break;
+    k = t.trim().toLowerCase().replace(/\s+/g, '');
+    if(k){ try{ localStorage.setItem(LS_MI_CLAVE, k); }catch(e){} }
+  }
+  return k;
+}
+function claveRechazada(){
+  try{ localStorage.removeItem(LS_MI_CLAVE); }catch(e){}
+  alert('La clave no es correcta. Volvé a escribirla.');
+  location.reload();
+  return new Promise(() => {});   // no sigue: la página se recarga
+}
+const MI_CLAVE = leerMiClave();
+const CLAVE_OBRAS_LECTURA = MI_CLAVE;   // la misma clave abre la obra
 
 // Los gastos de obra que paga Jose salen del mismo efectivo del credito.
 // Se leen de la otra tabla y se suman al consumo; sin esto el saldo miente.
@@ -271,9 +294,9 @@ const LS_KEY = 'gastos_jose_v1';
 // el que la tipeaba era José, en su propia app. Con esta clave es imposible
 // tocar la obra ni lo de sus hermanos. La clave MAESTRA no está en este
 // código, a propósito.
-const CLAVE_PERSONAL = 'fbb7f15ec1';
+const CLAVE_PERSONAL = MI_CLAVE;
 const LS_CLAVE_VIEJA = 'gastos_jose_clave';   // solo para limpiarla
-const H = {'apikey': ANON_KEY, 'Authorization': 'Bearer ' + ANON_KEY};
+const H = {'apikey': ANON_KEY, 'Authorization': 'Bearer ' + ANON_KEY, 'x-gastos-clave': MI_CLAVE};
 
 // Higiene: si el teléfono guardó la clave cuando existía el portón, se borra.
 // No queda ninguna ruta de código que lea esto para decidir si mostrar algo.
@@ -643,6 +666,7 @@ async function traerFilas(force){
     headers:{...H, 'Content-Type':'application/json'},
     body: JSON.stringify({clave: CLAVE_PERSONAL}),
   });
+  if(r.status === 403) return claveRechazada();
   if(!r.ok) throw new Error('server');
   const filas = await r.json();
   // `fecha` se usa para ordenar, agrupar y proyectar. Una sola fila con

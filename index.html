@@ -264,9 +264,32 @@ const LS_KEY = 'gastos_obras_v1';
 // que la tipeaba era José. Es la MISMA que ya llevan embebida /agus/ y
 // /facu/, así que esto no abre ninguna puerta nueva. La clave MAESTRA (la que
 // puede borrar tablas enteras) NO está en este código, a propósito.
-const CLAVE_OBRAS = '66db2f50ca';
+// 0152 (14-oct-2026) — CLAVE POR PERSONA. La clave ya NO está en el código:
+// este HTML es público y cualquiera la leía. Se pide UNA vez por teléfono y
+// queda guardada acá. Si el servidor la rechaza (403) se borra y se vuelve a pedir.
+// Cada uno tiene la suya (José, Agus, Facu): abre la obra y lo propio.
+const LS_MI_CLAVE = 'gastos_apex_mi_clave';
+function leerMiClave(){
+  let k = '';
+  try{ k = localStorage.getItem(LS_MI_CLAVE) || ''; }catch(e){}
+  while(!k){
+    const t = window.prompt('Escribí tu clave de la app de gastos (te la pasa José). Se pide una sola vez.');
+    if(t === null) break;
+    k = t.trim().toLowerCase().replace(/\s+/g, '');
+    if(k){ try{ localStorage.setItem(LS_MI_CLAVE, k); }catch(e){} }
+  }
+  return k;
+}
+function claveRechazada(){
+  try{ localStorage.removeItem(LS_MI_CLAVE); }catch(e){}
+  alert('La clave no es correcta. Volvé a escribirla.');
+  location.reload();
+  return new Promise(() => {});   // no sigue: la página se recarga
+}
+const MI_CLAVE = leerMiClave();
+const CLAVE_OBRAS = MI_CLAVE;
 const LS_CLAVE_VIEJA = 'gastos_obras_clave';   // solo para limpiarla
-const H = {'apikey': ANON_KEY, 'Authorization': 'Bearer ' + ANON_KEY};
+const H = {'apikey': ANON_KEY, 'Authorization': 'Bearer ' + ANON_KEY, 'x-gastos-clave': MI_CLAVE};
 
 // Higiene: si el teléfono guardó la clave cuando existía el portón, se borra.
 // No queda ninguna ruta de código que lea esto para decidir si mostrar algo.
@@ -664,6 +687,7 @@ async function traerFilas(force){
     headers:{...H, 'Content-Type':'application/json'},
     body: JSON.stringify({clave: CLAVE_OBRAS}),
   });
+  if(r.status === 403) return claveRechazada();
   if(!r.ok) throw new Error('server');
   const filas = await r.json();
   // `fecha` se usa para ordenar, agrupar y proyectar. Una sola fila con

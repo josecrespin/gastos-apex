@@ -300,11 +300,34 @@
 // GASTOS @@NOMBRE_UP@@ · Apex Sync v5 — UNA SOLA APP
 // Obra FAGU  → public.gastos_obras (quien = '@@YO@@')
 // Personal   → public.@@TABLA_PERSONAL@@
-// SIN CLAVE: las claves de lectura viajan en el código y se mandan solas.
+// 0152: la clave de cada uno se pide UNA vez y queda en el teléfono (no está en el código).
 // ============================================================
 const SUPABASE_URL = 'https://kfiywiqivibktzakclyv.supabase.co';
 const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtmaXl3aXFpdmlia3R6YWtjbHl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMyMTA1MTgsImV4cCI6MjA5ODc4NjUxOH0.Z1DQW5ySGolzrjsqeesg824cpctqa04BOS2RSH4NTNo';
-const H = {'apikey': ANON_KEY, 'Authorization': 'Bearer ' + ANON_KEY};
+// 0152 (14-oct-2026) — CLAVE POR PERSONA. La clave ya NO está en el código:
+// este HTML es público y cualquiera la leía. Se pide UNA vez por teléfono y
+// queda guardada acá. Si el servidor la rechaza (403) se borra y se vuelve a pedir.
+// Cada uno tiene la suya (José, Agus, Facu): abre la obra y lo propio.
+const LS_MI_CLAVE = 'gastos_apex_mi_clave';
+function leerMiClave(){
+  let k = '';
+  try{ k = localStorage.getItem(LS_MI_CLAVE) || ''; }catch(e){}
+  while(!k){
+    const t = window.prompt('Escribí tu clave de la app de gastos (te la pasa José). Se pide una sola vez.');
+    if(t === null) break;
+    k = t.trim().toLowerCase().replace(/\s+/g, '');
+    if(k){ try{ localStorage.setItem(LS_MI_CLAVE, k); }catch(e){} }
+  }
+  return k;
+}
+function claveRechazada(){
+  try{ localStorage.removeItem(LS_MI_CLAVE); }catch(e){}
+  alert('La clave no es correcta. Volvé a escribirla.');
+  location.reload();
+  return new Promise(() => {});   // no sigue: la página se recarga
+}
+const MI_CLAVE = leerMiClave();
+const H = {'apikey': ANON_KEY, 'Authorization': 'Bearer ' + ANON_KEY, 'x-gastos-clave': MI_CLAVE};
 
 const YO      = '@@YO@@';
 const NOMBRE  = '@@NOMBRE@@';
@@ -312,10 +335,10 @@ const ACCENT  = '@@ACCENT@@';
 
 const TABLA_OBRAS    = 'gastos_obras';
 const RPC_OBRAS      = 'gastos_obras_lista';
-const CLAVE_OBRAS    = '@@CLAVE_OBRAS@@';
+const CLAVE_OBRAS    = MI_CLAVE;
 const TABLA_PERSONAL = '@@TABLA_PERSONAL@@';
 const RPC_PERSONAL   = '@@RPC_PERSONAL@@';
-const CLAVE_PERSONAL = '@@CLAVE_PERSONAL@@';
+const CLAVE_PERSONAL = MI_CLAVE;
 
 // La cola local es la MISMA que traía la app vieja (mismo origen), así que
 // lo que haya quedado pendiente en el teléfono se sube igual. A los items
@@ -745,6 +768,7 @@ async function rpcLista(rpc, clave){
     headers:{...H, 'Content-Type':'application/json'},
     body: JSON.stringify({clave}),
   });
+  if(r.status === 403) return claveRechazada();
   if(!r.ok){
     let msg = '';
     try{ msg = await r.text(); }catch(e){}

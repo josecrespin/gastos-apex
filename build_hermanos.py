@@ -10,7 +10,7 @@ import os, shutil, json, re
 
 RAIZ = os.path.dirname(os.path.abspath(__file__))
 PLANTILLA = os.path.join(RAIZ, '_plantilla-hermano.html')
-SW_CACHE_V = 5          # subir cuando cambie el shell (v5 = fixes v10)
+SW_CACHE_V = 6          # subir cuando cambie el shell (v5 = fixes v10)
 
 HERMANOS = {
     'agus': {
@@ -18,8 +18,6 @@ HERMANOS = {
         'NOMBRE_UP': 'AGUS',
         'TABLA_PERSONAL': 'gastos_agus',
         'RPC_PERSONAL': 'gastos_agus_lista',
-        'CLAVE_PERSONAL': '2989913b7b',
-        'CLAVE_OBRAS': '66db2f50ca',
         # identidad pearl (--p-agus del design system)
         'ACCENT': '#E8E2D5', 'ACCENT_HI': '#F5F0E4', 'ACCENT_DEEP': '#CBBFA4',
         'ACCENT_SOFT': 'rgba(232,226,213,.14)', 'ON_ACCENT': '#20261F',
@@ -33,8 +31,6 @@ HERMANOS = {
         'NOMBRE_UP': 'FACU',
         'TABLA_PERSONAL': 'gastos_facu',
         'RPC_PERSONAL': 'gastos_facu_lista',
-        'CLAVE_PERSONAL': '56a2863905',
-        'CLAVE_OBRAS': '66db2f50ca',
         # identidad teal claro (--p-facu del design system)
         'ACCENT': '#4FB0C8', 'ACCENT_HI': '#6FC2D6', 'ACCENT_DEEP': '#3A8CA0',
         'ACCENT_SOFT': 'rgba(79,176,200,.15)', 'ON_ACCENT': '#062229',
