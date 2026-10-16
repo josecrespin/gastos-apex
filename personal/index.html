@@ -108,6 +108,16 @@
 
   <div style="text-align:center"><button class="pendientes" id="pendientes"></button></div>
 
+  <!-- v15 (16-oct-2026): una factura de FAGU que te dieron a vos va directo a la
+       bandeja «📥 Por cargar» del sistema de FAGU. NO es un gasto tuyo: no toca
+       tus finanzas. Usa tu misma clave (la base la exige). -->
+  <div class="grupo" style="margin-top:22px;border-top:1px dashed rgba(232,226,213,.25);padding-top:16px">
+    <label>Factura de FAGU</label>
+    <input id="fagu-nota" class="field" type="text" autocomplete="off" maxlength="200" placeholder="Nota para FAGU (opcional): ej. pagué yo en efectivo">
+    <button id="btn-fagu" class="chip chip--toggle" style="margin-top:10px">📷 Mandar factura a FAGU</button>
+    <input id="fagu-input" type="file" accept="image/*" hidden>
+  </div>
+
   <footer class="pie">
     Se guarda al instante · Jarvis lo lee y actualiza tus finanzas
     <br><button class="lnk" id="exportar">Exportar respaldo</button>
@@ -488,6 +498,43 @@ async function subirFoto(file, fecha){
   });
   return r.ok ? path : null;
 }
+
+// ---------- factura a FAGU (v15) ----------
+// Sube a comprobantes/gastos/bandeja/app-jose/AAAA/MM/<ts>-<azar>.jpg con el header
+// x-gastos-clave y la registra con fagu_bandeja_subir_app. Sin tu clave la base no
+// deja subir nada (0166 en fagu-web). Aparece en FAGU › Gastos › 📥 Por cargar.
+const faguInput = $('fagu-input');
+const btnFagu = $('btn-fagu');
+btnFagu.addEventListener('click', () => { if(!btnFagu.disabled) faguInput.click(); });
+faguInput.addEventListener('change', async () => {
+  const file = faguInput.files && faguInput.files[0];
+  faguInput.value = '';
+  if(!file) return;
+  btnFagu.disabled = true; btnFagu.textContent = '⏳ Mandando a FAGU…';
+  try{
+    const blob = await comprimirFoto(file);
+    const hoy = new Date().toLocaleString('sv-SE', {timeZone:'America/Argentina/Buenos_Aires'});
+    const path = 'gastos/bandeja/app-jose/' + hoy.slice(0, 4) + '/' + hoy.slice(5, 7) + '/'
+      + Date.now() + '-' + (Math.random().toString(36).slice(2, 8) || 'f') + '.jpg';
+    const up = await fetch(SUPABASE_URL + '/storage/v1/object/comprobantes/' + path, {
+      method:'POST', headers:{...H, 'Content-Type':'image/jpeg'}, body: blob,
+    });
+    if(!up.ok) throw new Error('la foto no subió (' + up.status + ')');
+    const r = await fetch(SUPABASE_URL + '/rest/v1/rpc/fagu_bandeja_subir_app', {
+      method:'POST', headers:{...H, 'Content-Type':'application/json'},
+      body: JSON.stringify({p_clave: MI_CLAVE, p_foto_path: path, p_nota: $('fagu-nota').value.trim()}),
+    });
+    if(r.status === 401 || r.status === 403) return claveRechazada();
+    const d = await r.json().catch(() => null);
+    if(!r.ok || !d || d.error) throw new Error((d && (d.error || d.message)) || ('HTTP ' + r.status));
+    $('fagu-nota').value = '';
+    toast('✓ Factura en la bandeja de FAGU', 'ok');
+  }catch(e){
+    toast('No se mandó a FAGU: ' + (e && e.message || e), 'error');
+  }finally{
+    btnFagu.disabled = false; btnFagu.textContent = '📷 Mandar factura a FAGU';
+  }
+});
 
 // ---------- monto ----------
 const montoEl = $('monto');
