@@ -25,6 +25,17 @@
 
 <!-- ============ CARGAR ============ -->
 <main id="vista-cargar">
+  <!-- v16 (6-nov-2026): gasto o ingreso, y dictado por voz. -->
+  <div class="modo" id="modo" role="tablist" aria-label="Qué cargás">
+    <button class="modo-b on" data-v="gasto" role="tab" aria-selected="true">💸 Gasto</button>
+    <button class="modo-b" data-v="ingreso" role="tab" aria-selected="false">💰 Ingreso</button>
+  </div>
+  <div class="voz">
+    <button id="btn-voz" class="voz-b" type="button" aria-label="Dictar por voz">🎤 <span id="voz-txt">Dictar</span></button>
+    <input id="dictado" class="field voz-f" type="text" autocomplete="off" enterkeyhint="done"
+      placeholder="o escribí: «15 mil de nafta con débito»">
+  </div>
+  <p class="voz-ok" id="voz-ok" hidden></p>
   <div class="monto-wrap">
     <div class="monto-box">
       <span class="signo">$</span>
@@ -37,12 +48,34 @@
     <input id="descripcion" class="field" type="text" autocomplete="off" placeholder="¿En qué? (ej: nafta, super, gym)">
   </div>
 
+  <div id="solo-ingreso" hidden>
+    <div class="grupo">
+      <label>¿De dónde viene?</label>
+      <div class="chips" id="chips-origen">
+        <button class="chip on" data-v="Sueldo">Sueldo</button>
+        <button class="chip" data-v="Integra Salud">Integra</button>
+        <button class="chip" data-v="Clientes Apex">Clientes Apex</button>
+        <button class="chip" data-v="FAGU">FAGU</button>
+        <button class="chip" data-v="Venta">Venta</button>
+        <button class="chip" data-v="Otro">Otro</button>
+      </div>
+    </div>
+    <div class="grupo">
+      <label>¿Cómo entró?</label>
+      <div class="chips" id="chips-metodo-ing">
+        <button class="chip on" data-v="transferencia">Transferencia</button>
+        <button class="chip" data-v="efectivo">Efectivo</button>
+      </div>
+    </div>
+  </div>
+  <div class="solo-gasto">
   <div class="grupo">
     <label>Tipo</label>
     <div class="chips" id="chips-categoria">
       <button class="chip chip--personal on" data-v="personal">Personal</button>
       <button class="chip chip--negocio" data-v="negocio">Negocio</button>
     </div>
+  </div>
   </div>
 
   <div class="grupo">
@@ -54,6 +87,7 @@
     </div>
     <input id="fecha" class="field" type="date" style="margin-top:10px" hidden>
   </div>
+  <div class="solo-gasto">
 
   <div class="grupo">
     <label>Método</label>
@@ -104,6 +138,7 @@
     </div>
   </div>
 
+  </div>
   <button id="guardar" class="btn-primary">Guardar gasto</button>
 
   <div style="text-align:center"><button class="pendientes" id="pendientes"></button></div>
@@ -111,7 +146,7 @@
   <!-- v15 (16-oct-2026): una factura de FAGU que te dieron a vos va directo a la
        bandeja «📥 Por cargar» del sistema de FAGU. NO es un gasto tuyo: no toca
        tus finanzas. Usa tu misma clave (la base la exige). -->
-  <div class="grupo" style="margin-top:22px;border-top:1px dashed rgba(232,226,213,.25);padding-top:16px">
+  <div class="grupo" id="grupo-fagu" style="margin-top:22px;border-top:1px dashed rgba(232,226,213,.25);padding-top:16px">
     <label>Factura de FAGU</label>
     <input id="fagu-nota" class="field" type="text" autocomplete="off" maxlength="200" placeholder="Nota para FAGU (opcional): ej. pagué yo en efectivo">
     <button id="btn-fagu" class="chip chip--toggle" style="margin-top:10px">📷 Mandar factura a FAGU</button>
@@ -631,6 +666,7 @@ setInterval(() => { if(leerLS().some(x => x.estado === 'pendiente')) reintentarP
 // ---------- guardar ----------
 const btn = $('guardar');
 btn.addEventListener('click', async () => {
+  if(sel.modo === 'ingreso') return guardarIngreso();
   const monto = Number(montoEl.value.replace(/\D/g,''));
   const hayFoto = !!(fotoInput.files && fotoInput.files.length);
   // Con foto, el monto puede ir vacío: queda marcado para que Jarvis
@@ -706,6 +742,409 @@ btn.addEventListener('click', async () => {
     $('foto-hint').hidden = true;
   }, 1500);
   refrescarPendientes();
+});
+
+// ============================================================
+// v16 (6-nov-2026) — INGRESOS + DICTADO POR VOZ
+// ------------------------------------------------------------
+// José: "que le pueda dictar por voz los gastos, anotar ingresos y de dónde
+// vienen, así tengo un balance mío al corriente". El dictado NO guarda solo:
+// llena el formulario y José revisa y toca Guardar (una mala escucha no
+// puede meter un gasto mal). Los ingresos van a `ingresos_jose` (0225),
+// misma clave y mismo modelo que los gastos: insert con header, lectura por RPC.
+// ============================================================
+const TABLA_ING = 'ingresos_jose';
+const LS_ING = 'ingresos_jose_pend';
+sel.modo = 'gasto'; sel.origen = 'Sueldo'; sel.metodoIng = 'transferencia';
+initChips('chips-origen','origen');
+initChips('chips-metodo-ing','metodoIng');
+
+function elegirChip(boxId, v){
+  const b = $(boxId).querySelector('.chip[data-v="' + v + '"]');
+  if(b && !b.classList.contains('on')) b.click();
+  return !!b;
+}
+
+function setModo(m){
+  sel.modo = m;
+  document.querySelectorAll('#modo .modo-b').forEach(b => {
+    const si = b.dataset.v === m;
+    b.classList.toggle('on', si); b.setAttribute('aria-selected', si);
+  });
+  document.querySelectorAll('.solo-gasto').forEach(d => { d.hidden = m !== 'gasto'; });
+  $('solo-ingreso').hidden = m !== 'ingreso';
+  $('grupo-fagu').hidden = m !== 'gasto';
+  $('foto-hint').hidden = m !== 'gasto' || !(fotoInput.files && fotoInput.files.length);
+  $('descripcion').placeholder = m === 'gasto' ? '¿En qué? (ej: nafta, super, gym)' : '¿De qué? (ej: sueldo octubre, Drip cuota 2)';
+  if(!btn.disabled) btn.textContent = m === 'gasto' ? 'Guardar gasto' : 'Guardar ingreso';
+  document.body.classList.toggle('modo-ingreso', m === 'ingreso');
+}
+$('modo').addEventListener('click', e => { const b = e.target.closest('.modo-b'); if(b) setModo(b.dataset.v); });
+
+// ---------- entender lo dictado ----------
+const sinTildes = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+const NUM_PAL = {un:1,uno:1,una:1,dos:2,tres:3,cuatro:4,cinco:5,seis:6,siete:7,ocho:8,nueve:9,diez:10,
+  once:11,doce:12,trece:13,catorce:14,quince:15,dieciseis:16,diecisiete:17,dieciocho:18,diecinueve:19,
+  veinte:20,veintiun:21,veintiuno:21,veintidos:22,veintitres:23,veinticuatro:24,veinticinco:25,
+  veintiseis:26,veintisiete:27,veintiocho:28,veintinueve:29,treinta:30,cuarenta:40,cincuenta:50,
+  sesenta:60,setenta:70,ochenta:80,noventa:90,cien:100,ciento:100,doscientos:200,doscientas:200,
+  trescientos:300,trescientas:300,cuatrocientos:400,cuatrocientas:400,quinientos:500,quinientas:500,
+  seiscientos:600,seiscientas:600,setecientos:700,setecientas:700,ochocientos:800,ochocientas:800,
+  novecientos:900,novecientas:900};
+// "quince mil quinientos" → "15500". "una coca" queda como está: un/una solos no son plata.
+function palabrasANumeros(t){
+  const tk = t.split(/\s+/), out = [];
+  let i = 0;
+  while(i < tk.length){
+    let j = i, total = 0, cur = 0, fuerte = false, usado = false;
+    while(j < tk.length){
+      const w = tk[j];
+      if(w in NUM_PAL){ cur += NUM_PAL[w]; usado = true; if(NUM_PAL[w] > 1) fuerte = true; j++; continue; }
+      if(w === 'mil' && (usado || (j === i && !/^\d+$/.test(out[out.length - 1] || '')))){ total += (cur || 1) * 1000; cur = 0; usado = true; fuerte = true; j++; continue; }
+      if(/^millon(es)?$/.test(w) && usado){ total = (total + (cur || 1)) * 1e6; cur = 0; fuerte = true; j++; continue; }
+      if(w === 'y' && usado && j + 1 < tk.length && (tk[j + 1] in NUM_PAL)){ j++; continue; }
+      break;
+    }
+    if(usado && fuerte){ out.push(String(total + cur)); i = j; }
+    else { out.push(tk[i]); i++; }
+  }
+  return out.join(' ');
+}
+function buscarMontos(t){
+  const re = /(\d{1,3}(?:[.,]\d{3})+|\d+)(?:[.,](\d{1,2}))?\s*(mil|lucas?|k|millon(?:es)?|palos?)?(?=\s|$|[^\w])/g;
+  const res = [];
+  let m;
+  while((m = re.exec(t))){
+    let ent = m[1], dec = m[2] || '', mult = 1;
+    if(m[3]) mult = /^(mil|luca|lucas|k)$/.test(m[3]) ? 1000 : 1e6;
+    const v = (Number(ent.replace(/[.,]/g, '')) + (dec ? Number('0.' + dec) : 0)) * mult;
+    const despues = t.slice(re.lastIndex, re.lastIndex + 12);
+    if(/^\s*cuotas?/.test(despues)) continue;            // "en 3 cuotas" no es el monto
+    res.push({v: Math.round(v), txt: m[0]});
+  }
+  return res;
+}
+const ORIGEN_CLAVES = [
+  ['Integra Salud', /integra/],
+  ['Clientes Apex', /cliente|apex|drip|lupe|presupuesto|anticipo/],
+  ['FAGU', /fagu|local|restaurante|retiro de socio|retire del negocio/],
+  ['Venta', /vend[ii]|venta|moto|marketplace/],
+  ['Sueldo', /sueldo|salario|aguinaldo|haberes/],
+];
+function entender(original){
+  let t = ' ' + palabrasANumeros(sinTildes(original).replace(/\$/g, ' ').replace(/\s+/g, ' ').trim()) + ' ';
+  const r = {modo: null, monto: 0, metodo: null, tarjeta: null, cuotas: null, fecha: null, categoria: null, origen: null, desc: ''};
+  if(/\b(cobre|me pagaron|me pago|me pasaron|me transfirieron|me depositaron|ingreso|ingresaron|me entro|me entraron|entraron|recibi|gane)\b/.test(t)) r.modo = 'ingreso';
+  else if(/\b(gaste|pague|compre|gasto|saque)\b/.test(t)) r.modo = 'gasto';
+  const montos = buscarMontos(t);
+  if(montos.length){
+    const mx = montos.reduce((a, b) => b.v > a.v ? b : a);
+    r.monto = mx.v; t = t.replace(mx.txt, ' ');
+  }
+  const c = t.match(/\b(\d{1,2}) cuotas?\b/);
+  if(c){ r.cuotas = Number(c[1]); r.metodo = 'credito'; t = t.replace(c[0], ' '); }
+  if(/\b(efectivo|cash|en mano)\b/.test(t)) r.metodo = 'efectivo';
+  else if(/\b(transferencia|transferi|transfirieron|mercado ?pago|alias|cbu)\b/.test(t)) r.metodo = 'transferencia';
+  else if(/\bdebito\b/.test(t)) r.metodo = 'debito';
+  else if(/\b(credito|tarjeta|visa)\b/.test(t)) r.metodo = r.metodo || 'credito';
+  if(/\bfrances\b/.test(t)) r.tarjeta = 'Visa Francés BBVA';
+  else if(/\bbbva\b/.test(t)) r.tarjeta = 'Visa BBVA';
+  else if(/\bnacion\b/.test(t)) r.tarjeta = 'Nación';
+  if(r.tarjeta && !r.metodo) r.metodo = 'credito';
+  if(/\b(anteayer|antes de ayer|antier)\b/.test(t)) r.fecha = -2;
+  else if(/\bayer\b/.test(t)) r.fecha = -1;
+  else if(/\bhoy\b/.test(t)) r.fecha = 0;
+  if(/\b(del negocio|para el negocio|negocio|para fagu|del local)\b/.test(t)) r.categoria = 'negocio';
+  for(const [o, rx] of ORIGEN_CLAVES) if(rx.test(t)){ r.origen = o; break; }
+  if(r.origen && !r.modo && r.origen !== 'Venta') r.modo = 'ingreso';
+  // Lo que queda, sin las palabras de relleno, es el "en qué".
+  const RELLENO = /\b(gaste|pague|compre|gasto|saque|cobre|me|pagaron|pago|pasaron|transfirieron|depositaron|ingreso|ingresaron|entro|entraron|recibi|gane|en|de|del|con|por|pesos?|el|la|los|las|un|una|unos|unas|y|a|al|que|fue|hoy|ayer|anteayer|antes|efectivo|cash|mano|transferencia|transferi|mercado|mercadopago|alias|cbu|debito|credito|tarjeta|visa|frances|bbva|nacion|cuotas?|lucas?|mil|negocio|para|mi|mis|se|lo|le)\b/g;
+  r.desc = t.replace(/\d+/g, ' ').replace(RELLENO, ' ').replace(/[^\w\sñ]/g, ' ').replace(/\s+/g, ' ').trim();
+  if(r.desc) r.desc = r.desc.charAt(0).toUpperCase() + r.desc.slice(1);
+  return r;
+}
+
+function aplicarDictado(txt){
+  txt = String(txt || '').trim();
+  if(!txt) return;
+  const r = entender(txt);
+  if(r.modo) setModo(r.modo);
+  if(r.monto){ montoEl.value = r.monto.toLocaleString('es-AR'); }
+  if(r.desc) $('descripcion').value = r.desc;
+  if(r.fecha === 0) elegirChip('chips-fecha', 'hoy');
+  else if(r.fecha === -1) elegirChip('chips-fecha', 'ayer');
+  else if(r.fecha === -2){ elegirChip('chips-fecha', 'otra'); const d = new Date(); d.setDate(d.getDate() - 2); $('fecha').value = isoLocal(d); }
+  if(sel.modo === 'gasto'){
+    if(r.metodo) elegirChip('chips-metodo', r.metodo);
+    if(r.tarjeta) elegirChip('chips-tarjeta', r.tarjeta);
+    if(r.cuotas && !elegirChip('chips-cuotas', String(r.cuotas))) toast('Cuotas: elegí la más cercana a ' + r.cuotas, 'warn');
+    if(r.categoria) elegirChip('chips-categoria', r.categoria);
+  } else {
+    if(r.origen) elegirChip('chips-origen', r.origen);
+    if(r.metodo === 'efectivo' || r.metodo === 'transferencia') elegirChip('chips-metodo-ing', r.metodo);
+  }
+  const partes = [sel.modo === 'gasto' ? '💸 Gasto' : '💰 Ingreso',
+    r.monto ? fmt$(r.monto) : '<b class="falta">sin monto</b>'];
+  if($('descripcion').value) partes.push(esc($('descripcion').value));
+  partes.push(sel.modo === 'gasto' ? METODO_TXT[sel.metodo] : (sel.origen + ' · ' + METODO_TXT[sel.metodoIng]));
+  const ok = $('voz-ok');
+  ok.innerHTML = 'Entendí: ' + partes.join(' · ') + '<br><small>' +
+    (r.monto ? 'Revisá y tocá Guardar.' : 'No escuché el monto: escribilo arriba.') + '</small>';
+  ok.hidden = false;
+  if(!r.monto) montoEl.focus();
+}
+
+const dictadoEl = $('dictado');
+dictadoEl.addEventListener('change', () => aplicarDictado(dictadoEl.value));
+dictadoEl.addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); dictadoEl.blur(); } });
+
+// Voz: el reconocimiento del navegador si está; si no (o sin permiso), el
+// 🎤 del teclado del iPhone en el campo de texto hace lo mismo.
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let reco = null, escuchando = false, ultimoFinal = '';
+function pintarVoz(){
+  $('btn-voz').classList.toggle('on', escuchando);
+  $('voz-txt').textContent = escuchando ? 'Te escucho… (tocá para cortar)' : 'Dictar';
+}
+function alTeclado(msg){
+  dictadoEl.focus();
+  toast(msg, 'warn');
+}
+$('btn-voz').addEventListener('click', () => {
+  if(!SR) return alTeclado('Tocá el 🎤 del teclado y decí el gasto');
+  if(escuchando){ try{ reco.stop(); }catch(e){} return; }
+  reco = new SR();
+  reco.lang = 'es-AR'; reco.interimResults = true; reco.continuous = false; reco.maxAlternatives = 1;
+  ultimoFinal = '';
+  reco.onresult = e => {
+    let txt = '';
+    for(let i = 0; i < e.results.length; i++) txt += e.results[i][0].transcript;
+    dictadoEl.value = txt;
+    if(e.results[e.results.length - 1].isFinal){ ultimoFinal = txt; aplicarDictado(txt); }
+  };
+  reco.onerror = e => {
+    if(e.error === 'not-allowed' || e.error === 'service-not-allowed') alTeclado('Sin permiso de micrófono: usá el 🎤 del teclado');
+    else if(e.error === 'no-speech') toast('No escuché nada — probá de nuevo', 'warn');
+    else if(e.error !== 'aborted') alTeclado('No anduvo el dictado: usá el 🎤 del teclado');
+  };
+  reco.onend = () => {
+    escuchando = false; pintarVoz();
+    if(dictadoEl.value && dictadoEl.value !== ultimoFinal) aplicarDictado(dictadoEl.value);
+  };
+  try{ reco.start(); escuchando = true; pintarVoz(); if(navigator.vibrate) navigator.vibrate(20); }
+  catch(e){ alTeclado('Usá el 🎤 del teclado'); }
+});
+
+// ---------- guardar un ingreso ----------
+async function postIngreso(ing){
+  const r = await fetch(SUPABASE_URL + '/rest/v1/' + TABLA_ING, {
+    method:'POST',
+    headers:{...H, 'Content-Type':'application/json', 'Prefer':'return=minimal'},
+    body: JSON.stringify(ing),
+  });
+  if(r.ok) return true;
+  let msg = ''; try{ msg = await r.text(); }catch(e){}
+  return r.status === 409 && /23505|duplicate/i.test(msg);
+}
+const leerIngPend = () => { try{ return JSON.parse(localStorage.getItem(LS_ING)) || []; }catch(e){ return []; } };
+const escribirIngPend = a => { try{ localStorage.setItem(LS_ING, JSON.stringify(a)); }catch(e){} };
+async function reintentarIngresos(){
+  const p = leerIngPend(); if(!p.length || !navigator.onLine) return;
+  const quedan = [];
+  for(const it of p){ let ok = false; try{ ok = await postIngreso(it); }catch(e){} if(!ok) quedan.push(it); }
+  escribirIngPend(quedan);
+  if(quedan.length < p.length) window.__ing = null;
+}
+window.addEventListener('online', reintentarIngresos);
+setInterval(reintentarIngresos, 60000);
+reintentarIngresos();
+
+async function guardarIngreso(){
+  const monto = Number(montoEl.value.replace(/\D/g,''));
+  if(!monto){ montoEl.focus(); toast('Falta el monto', 'warn'); return; }
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  const ing = { fecha: fechaElegida(), monto, origen: sel.origen, descripcion: $('descripcion').value.trim(),
+                metodo: sel.metodoIng, local_id: uuid() };
+  let ok = false;
+  try{ ok = await postIngreso(ing); }catch(e){}
+  if(!ok){ const p = leerIngPend(); p.push(ing); escribirIngPend(p); }
+  window.__ing = null;
+  if(navigator.vibrate) navigator.vibrate(ok ? 30 : [60,60,60]);
+  btn.classList.add('ok');
+  btn.textContent = ok ? '✓ Ingreso guardado' : '✓ Guardado acá';
+  toast(ok ? '✓ ' + fmt$(monto) + ' de ' + sel.origen + ' — ya suma en el Resumen'
+           : 'Sin conexión — quedó en el teléfono y se envía solo', ok ? 'ok' : 'error');
+  setTimeout(() => {
+    btn.classList.remove('ok'); btn.disabled = false;
+    montoEl.value = ''; $('descripcion').value = ''; dictadoEl.value = ''; $('voz-ok').hidden = true;
+    elegirChip('chips-fecha', 'hoy'); $('fecha').hidden = true;
+    setModo('ingreso');
+  }, 1500);
+}
+
+// ---------- leer ingresos ----------
+window.__ing = null; window.__ingFallo = false;
+async function traerIngresos(force){
+  if(window.__ing && !force) return window.__ing;
+  try{
+    const r = await fetch(SUPABASE_URL + '/rest/v1/rpc/ingresos_jose_lista', {
+      method:'POST', headers:{...H, 'Content-Type':'application/json'},
+      body: JSON.stringify({clave: MI_CLAVE}),
+    });
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    const f = await r.json();
+    window.__ing = (Array.isArray(f) ? f : []).map(x => ({...x, fecha: String(x.fecha || '').slice(0, 10)}))
+      .concat(leerIngPend().map(x => ({...x, _pendiente: true})));
+    window.__ingFallo = false;
+  }catch(e){
+    window.__ing = leerIngPend().map(x => ({...x, _pendiente: true}));
+    window.__ingFallo = true;
+  }
+  return window.__ing;
+}
+
+// ---------- análisis ----------
+const RUBROS = [
+  ['🛒 Súper y almacén', /super|carrefour|\bvea\b|chango|disco|almacen|verduler|carnic|despensa|kiosco|maxiconsumo|dia\b/],
+  ['🍔 Comida y salidas', /resto|restaurant|comida|delivery|pedidos ?ya|rappi|\bbar\b|cafe|cerveza|birra|helado|pizza|salida|boliche|cena|almuerzo|mcdonald|burger|sushi|empanada|lomo|asado|fernet|vino/],
+  ['⛽ Auto y transporte', /nafta|combustible|ypf|shell|axion|uber|taxi|cabify|peaje|estaciona|moto|mecanic|gomer|patente|colectivo|sube|lavadero|auto\b|cochera/],
+  ['🏠 Casa y servicios', /\bluz\b|edet|agua|\bsat\b|\bgas\b|naturgy|internet|telefon|celular|claro|movistar|alquiler|expensa|cable|flow|limpieza|ferreter/],
+  ['💪 Salud y gym', /gym|gimnasio|farmacia|medic|doctor|osde|obra social|suplement|protein|creatina|dentist|kinesi|analisis|omega|vitamina/],
+  ['📱 Suscripciones', /netflix|spotify|claude|chatgpt|openai|google|icloud|apple|youtube|disney|hbo|max\b|suscrip|prime|paramount|supabase|dominio/],
+  ['👕 Ropa y compras', /ropa|zapatilla|remera|pantal|campera|mercado ?libre|\bml\b|tienda|shopping|perfume|regalo/],
+  ['💳 Cuotas y deudas', /cuota|prestamo|resumen|tarjeta|deuda|interes/],
+  ['👪 Familia', /mama|papa|hermano|abuela|familia|cumple/],
+];
+function rubroDe(f, mapa){
+  if(categoriaDe(f, mapa) === 'negocio') return '🏪 Negocio';
+  const d = sinTildes(f.descripcion);
+  for(const [n, rx] of RUBROS) if(rx.test(d)) return n;
+  return '❓ Otros';
+}
+const ymDe = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+const sumar = a => a.reduce((s, f) => s + montoEnt(f), 0);
+const mesTxt = d => { const t = d.toLocaleDateString('es-AR', {month:'long'}); return t.charAt(0).toUpperCase() + t.slice(1); };
+
+function bloqueBalance(filas){
+  const hoy = new Date(), ym = ymDe(hoy);
+  const ing = (window.__ing || []).filter(f => f.fecha.startsWith(ym));
+  const entro = sumar(ing), salio = sumar(filas.filter(f => f.fecha.startsWith(ym)));
+  const bal = entro - salio;
+  return '<section class="card balance">' +
+    '<h3>Balance de ' + esc(mesTxt(hoy)) + '</h3>' +
+    '<div class="bal-val money ' + (bal >= 0 ? 'pos' : 'neg') + '">' + (bal >= 0 ? '+ ' : '− ') + fmt$(Math.abs(bal)).replace('$ ', '$ ') + '</div>' +
+    '<div class="bal-fila"><span>💰 Entró <b class="money">' + fmt$(entro) + '</b></span>' +
+    '<span>💸 Salió <b class="money">' + fmt$(salio) + '</b></span></div>' +
+    (!ing.length ? '<p class="credito-nota">Todavía no cargaste ingresos este mes: tocá <b>💰 Ingreso</b> en Cargar para ver el balance real.</p>' : '') +
+    (window.__ingFallo ? '<p class="credito-nota"><b style="color:#F2705F">No se pudieron leer los ingresos: el balance está incompleto.</b></p>' : '') +
+    '</section>';
+}
+
+function barras(items, max){
+  return '<div class="bars bars--metodo">' + items.map(it =>
+    '<div class="bar-row"><span class="quien">' + esc(it.n) + '</span>' +
+    '<div class="bar-track"><div class="bar-fill" style="--w:' + (it.v / max * 100).toFixed(1) + '%"></div></div>' +
+    '<span class="cuanto money">' + fmt$(it.v) + (it.extra || '') + '</span></div>').join('') + '</div>';
+}
+
+function bloqueAnalisis(filas, mapa){
+  const hoy = new Date(), ym = ymDe(hoy);
+  const ant = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1), ymAnt = ymDe(ant);
+  const delMes = filas.filter(f => f.fecha.startsWith(ym));
+  const delAnt = filas.filter(f => f.fecha.startsWith(ymAnt));
+  if(!delMes.length) return '';
+  const porR = {}, porRAnt = {};
+  for(const f of delMes){ const r = rubroDe(f, mapa); porR[r] = (porR[r] || 0) + montoEnt(f); }
+  for(const f of delAnt){ const r = rubroDe(f, mapa); porRAnt[r] = (porRAnt[r] || 0) + montoEnt(f); }
+  const total = sumar(delMes);
+  const items = Object.keys(porR).sort((a, b) => porR[b] - porR[a]).map(n => {
+    const a = porRAnt[n] || 0, v = porR[n];
+    let extra = '';
+    if(a){ const d = Math.round((v - a) / a * 100); extra = ' <small class="' + (d > 0 ? 'sube' : 'baja') + '">' + (d > 0 ? '▲' : '▼') + Math.abs(d) + '%</small>'; }
+    return {n, v, extra};
+  });
+  // Ritmo: lo gastado hasta hoy contra lo del mes pasado hasta el mismo día.
+  const dia = hoy.getDate(), diasMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).getDate();
+  const corteAnt = ymAnt + '-' + String(Math.min(dia, new Date(ant.getFullYear(), ant.getMonth() + 1, 0).getDate())).padStart(2, '0');
+  const antAlDia = sumar(delAnt.filter(f => f.fecha <= corteAnt));
+  const porDia = total / dia, cierre = Math.round(porDia * diasMes);
+  const top = items[0];
+  const lis = [];
+  lis.push('Lo que más pesa: <b>' + esc(top.n) + '</b> (' + fmt$(top.v) + ', ' + Math.round(top.v / total * 100) + '% del mes).');
+  if(antAlDia){
+    const d = Math.round((total - antAlDia) / antAlDia * 100);
+    lis.push(d > 0 ? 'Vas gastando <b>' + d + '% más</b> que en ' + esc(mesTxt(ant)) + ' al día ' + dia + ' (' + fmt$(antAlDia) + ').'
+                   : 'Vas gastando <b>' + Math.abs(d) + '% menos</b> que en ' + esc(mesTxt(ant)) + ' al día ' + dia + ' (' + fmt$(antAlDia) + ').');
+  }
+  lis.push('Promedio por día: <b>' + fmt$(porDia) + '</b>. A este ritmo cerrás el mes en <b>~' + fmt$(cierre) + '</b>.');
+  const entro = sumar((window.__ing || []).filter(f => f.fecha.startsWith(ym)));
+  if(entro) lis.push(entro - cierre >= 0 ? 'Si seguís así te sobran <b>~' + fmt$(entro - cierre) + '</b> este mes.'
+                                         : 'Si seguís así te faltan <b>~' + fmt$(cierre - entro) + '</b> este mes.');
+  return '<section class="card"><h3>¿En qué gastás?</h3>' + barras(items, items[0].v) +
+    '<p class="credito-nota">▲▼ contra ' + esc(mesTxt(ant)) + ' completo. El rubro sale de la descripción del gasto.</p></section>' +
+    '<section class="card"><h3>Análisis del mes</h3><ul class="analisis">' + lis.map(l => '<li>' + l + '</li>').join('') + '</ul></section>';
+}
+
+function chartDoble(filas, ing){
+  const hoy = new Date(), labs = [], g = [], e = [];
+  for(let k = 5; k >= 0; k--){
+    const d = new Date(hoy.getFullYear(), hoy.getMonth() - k, 1), ym = ymDe(d);
+    labs.push(d.toLocaleDateString('es-AR', {month:'short'}).replace('.', ''));
+    g.push(sumar(filas.filter(f => f.fecha.startsWith(ym))));
+    e.push(sumar(ing.filter(f => f.fecha.startsWith(ym))));
+  }
+  const max = Math.max(...g, ...e, 1), base = 124, top = 26, bw = 16, slot = 320 / 6;
+  let s = '<svg class="grafico" viewBox="0 0 320 150" role="img" aria-label="Ingresos y gastos por mes: ' +
+    labs.map((l, i) => l + ' entró ' + fmt$(e[i]) + ' salió ' + fmt$(g[i])).join(', ') + '">';
+  s += '<line x1="0" y1="' + (base + .5) + '" x2="320" y2="' + (base + .5) + '" stroke="rgba(232,226,213,.18)" stroke-width="1"/>';
+  labs.forEach((l, i) => {
+    const x0 = slot * i + (slot - bw * 2 - 4) / 2;
+    [[e[i], '#7BC79A', 0], [g[i], '#E8E2D5', bw + 4]].forEach(([v, col, dx]) => {
+      const h = Math.max(v / max * (base - top), v ? 2 : 0);
+      if(h) s += '<path d="' + barPath(x0 + dx, base - h, bw, h, 3) + '" fill="' + col + '"' + (i === 5 ? '' : ' opacity=".6"') + '/>';
+    });
+    const bal = e[i] - g[i];
+    if(e[i]) s += '<text x="' + (slot * i + slot / 2) + '" y="16" class="g-val' + (i === 5 ? ' g-val--cur' : '') + '" text-anchor="middle" fill="' + (bal >= 0 ? '#7BC79A' : '#F2705F') + '">' + (bal >= 0 ? '+' : '−') + fmtK(Math.abs(bal)) + '</text>';
+    s += '<text x="' + (slot * i + slot / 2) + '" y="142" class="g-lab" text-anchor="middle">' + esc(l) + '</text>';
+  });
+  return s + '</svg>';
+}
+
+function bloqueIngresos(filas){
+  const ing = window.__ing || [];
+  const hoy = new Date(), ym = ymDe(hoy);
+  const delMes = ing.filter(f => f.fecha.startsWith(ym));
+  let html = '<section class="card"><h3>Entró vs salió por mes</h3>' + chartDoble(filas, ing) +
+    '<div class="leyenda"><span><i style="background:#7BC79A"></i>Ingresos</span><span><i style="background:#E8E2D5"></i>Gastos</span></div></section>';
+  if(delMes.length){
+    const por = {};
+    for(const f of delMes) por[f.origen] = (por[f.origen] || 0) + montoEnt(f);
+    const items = Object.keys(por).sort((a, b) => por[b] - por[a]).map(n => ({n, v: por[n]}));
+    html += '<section class="card"><h3>Ingresos de ' + esc(mesTxt(hoy)) + ' por origen</h3>' + barras(items, items[0].v) +
+      delMes.slice().reverse().map(f =>
+        '<div class="tj-row ing-row"><span class="dos-lineas"><span>' + esc(f.descripcion || f.origen) + (f._pendiente ? ' ⏳' : '') + '</span>' +
+        '<span class="mes-sub">' + esc(etiquetaDia(f.fecha)) + ' · ' + esc(f.origen) + ' · ' + esc(METODO_TXT[f.metodo] || f.metodo) + '</span></span>' +
+        '<b class="money">' + fmt$(montoEnt(f)) + '</b>' +
+        (f.id ? '<button class="ing-x" data-ing-del="' + f.id + '" aria-label="Borrar ingreso">✕</button>' : '') + '</div>').join('') +
+      '</section>';
+  }
+  return html;
+}
+
+$('res-contenido').addEventListener('click', async e => {
+  const b = e.target.closest('[data-ing-del]'); if(!b) return;
+  if(!confirm('¿Borrar este ingreso? No se puede deshacer.')) return;
+  b.disabled = true;
+  try{
+    const r = await fetch(SUPABASE_URL + '/rest/v1/rpc/ingreso_borrar_jose', {
+      method:'POST', headers:{...H, 'Content-Type':'application/json'},
+      body: JSON.stringify({clave: MI_CLAVE, fila_id: Number(b.dataset.ingDel)}),
+    });
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    toast('Ingreso borrado', 'ok');
+    await traerIngresos(true);
+    renderResumen(filasCache || []);
+  }catch(err){ b.disabled = false; toast('No se pudo borrar — probá de nuevo', 'error'); }
 });
 
 $('exportar').addEventListener('click', () => {
@@ -922,7 +1361,7 @@ $('foto-overlay').addEventListener('click', () => $('foto-overlay').classList.re
 
 // ---------- RESUMEN ----------
 async function abrirResumen(force){
-  await traerObraDeJose();
+  await Promise.all([traerObraDeJose(), traerIngresos(force)]);
   const cont = $('res-contenido');
   $('actualizado').textContent = '';
   if(!filasCache || force){
@@ -933,7 +1372,7 @@ async function abrirResumen(force){
       return;
     }
   }
-  if(!filasCache.length){
+  if(!filasCache.length && !(window.__ing || []).length){
     cont.innerHTML = '<div class="vacio"><b>Todavía no cargaste nada</b>Cargá tu primer gasto desde la pestaña Cargar.</div>';
     return;
   }
@@ -1053,7 +1492,7 @@ function renderResumen(filas){
   const comprometido = meses.reduce((s, m) => s + Math.round(m.items.reduce((x, i) => x + i.v, 0)), 0);
 
   // HERO: gastado este mes + onda firma + split Negocio / Personal
-  let html =
+  let html = bloqueBalance(filas) +
     '<section class="hero">' +
       '<div class="etiqueta">Gastado este mes</div>' +
       '<div class="total money">' + fmt$(totalMes) + '</div>' +
@@ -1120,6 +1559,8 @@ function renderResumen(filas){
       '<div class="sub">cuotas + fijos que vienen</div>' +
     '</div></div>';
 
+  html += bloqueAnalisis(filas, mapa);
+
   // POR MÉTODO (mes actual)
   const metodos = ['efectivo','transferencia','debito','credito'].filter(m => porMetodo[m]);
   if(metodos.length){
@@ -1143,6 +1584,8 @@ function renderResumen(filas){
 
   // GASTO POR MES
   html += '<section class="card"><h3>Gasto por mes</h3>' + chartMeses(filas, '#E8E2D5') + '</section>';
+
+  html += bloqueIngresos(filas);
 
   // COMPROMISOS QUE VIENEN
   html += '<div class="seccion"><h2>Compromisos que vienen</h2></div>';
