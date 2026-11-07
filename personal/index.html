@@ -906,13 +906,24 @@ function pintarVoz(){
   $('btn-voz').classList.toggle('on', escuchando);
   $('voz-txt').textContent = escuchando ? 'Te escucho… (tocá para cortar)' : 'Dictar';
 }
+let vozTimer = null;
+function cortarVoz(){
+  escuchando = false; pintarVoz();
+  clearTimeout(vozTimer);
+  const r = reco; reco = null;
+  if(dictadoEl.value && dictadoEl.value !== ultimoFinal){ ultimoFinal = dictadoEl.value; aplicarDictado(dictadoEl.value); }
+  if(r){ r.onend = null; r.onresult = null; r.onerror = null; try{ r.stop(); }catch(e){} setTimeout(() => { try{ r.abort(); }catch(e){} }, 300); }
+}
 function alTeclado(msg){
   dictadoEl.focus();
   toast(msg, 'warn');
 }
 $('btn-voz').addEventListener('click', () => {
   if(!SR) return alTeclado('Tocá el 🎤 del teclado y decí el gasto');
-  if(escuchando){ try{ reco.stop(); }catch(e){} return; }
+  // 7-nov (José: "no corta nunca"): en el iPhone stop() a veces no dispara
+  // onend. Al tocar, se corta ACÁ mismo: se apaga el botón, se aplica lo que
+  // se entendió y se aborta el reconocimiento.
+  if(escuchando){ cortarVoz(); return; }
   reco = new SR();
   reco.lang = 'es-AR'; reco.interimResults = true; reco.continuous = false; reco.maxAlternatives = 1;
   ultimoFinal = '';
@@ -927,11 +938,10 @@ $('btn-voz').addEventListener('click', () => {
     else if(e.error === 'no-speech') toast('No escuché nada — probá de nuevo', 'warn');
     else if(e.error !== 'aborted') alTeclado('No anduvo el dictado: usá el 🎤 del teclado');
   };
-  reco.onend = () => {
-    escuchando = false; pintarVoz();
-    if(dictadoEl.value && dictadoEl.value !== ultimoFinal) aplicarDictado(dictadoEl.value);
-  };
-  try{ reco.start(); escuchando = true; pintarVoz(); if(navigator.vibrate) navigator.vibrate(20); }
+  reco.onend = () => { if(escuchando) cortarVoz(); };
+  try{ reco.start(); escuchando = true; pintarVoz(); if(navigator.vibrate) navigator.vibrate(20);
+    // Si el navegador no corta solo, a los 15 s corta la app.
+    vozTimer = setTimeout(() => { if(escuchando) cortarVoz(); }, 15000); }
   catch(e){ alTeclado('Usá el 🎤 del teclado'); }
 });
 
